@@ -3,5 +3,7 @@ export default function LessonList(courseId: string) {
         credentials: "include",
         method: "GET",
         mode: "cors",
-    }).then((data) => console.log(data));
+    })
+        .then((data) => data.json())
+        .then((json) => console.log(json));
 }
