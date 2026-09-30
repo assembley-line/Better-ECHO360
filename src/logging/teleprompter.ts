@@ -1,3 +1,1 @@
-export class Teleprompter {
-  
-}
+export class Teleprompter {}

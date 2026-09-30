@@ -3,26 +3,26 @@ import monkey from "vite-plugin-monkey";
 import path from "path";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src"),
+        },
     },
-  },
-  plugins: [
-    monkey({
-      entry: "src/main.ts",
-      userscript: {
-        name: "Better ECHO360",
-        description:
-          "Enhances the ECHO360 experience with additional features.",
-        author: "CharlieR",
-        match: ["*://echo360.net.au/lesson/*"],
-        namespace: "http://tampermonkey.net/",
-        version: "1.0.0-alpha",
-        "run-at": "document-start",
-        icon: "https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png",
-        grant: "none",
-      },
-    }),
-  ],
+    plugins: [
+        monkey({
+            entry: "src/main.ts",
+            userscript: {
+                name: "Better ECHO360",
+                description:
+                    "Enhances the ECHO360 experience with additional features.",
+                author: "CharlieR",
+                match: ["*://echo360.net.au/*"],
+                namespace: "http://tampermonkey.net/",
+                version: "1.0.0-alpha",
+                "run-at": "document-start",
+                icon: "https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png",
+                grant: "none",
+            },
+        }),
+    ],
 });
