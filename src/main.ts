@@ -1,3 +1,5 @@
+import rawStyles from "@/style.css?inline";
+
 import { grabStore } from "./routes/lesson";
 import { RouterService } from "./services/router";
 
@@ -14,6 +16,14 @@ declare global {
 
 (function () {
     "use strict";
+
+    function injectStyles(): void {
+        const style = document.createElement("style");
+        style.id = "be360-styles";
+        style.textContent = rawStyles;
+        document.head.appendChild(style);
+    }
+    injectStyles();
 
     const router = new RouterService();
     router.init();
