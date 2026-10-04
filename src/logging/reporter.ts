@@ -7,7 +7,7 @@ export class Reporter {
     private static prefix = "Better ECHO360";
 
     init(): void {
-        this.tell("Reporter attached");
+        this.report("Reporter attached");
     }
 
     private stamp(input: string): string {
