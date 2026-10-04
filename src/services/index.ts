@@ -5,5 +5,38 @@ export abstract class Service {
 
     protected constructor(name: string) {
         this.reporter = new Reporter(name);
+        this.reporter.init()
     }
+}
+
+export abstract class HardService extends Service { }
+export abstract class SoftService extends Service {
+    protected enabled: boolean;
+
+    protected constructor(name: string) {
+        super(name);
+        this.enabled = true
+    }
+
+    protected enable(): void {
+        this.reporter.tell("Service has been enabled")
+        this.enabled = true;
+        this.onToggleService()
+    }
+
+    protected disable(): void {
+        this.reporter.tell("Service has been disabled")
+        this.enabled = false;
+        this.onToggleService()
+    }
+
+    protected toggle(): void {
+        if (this.enabled) {
+            this.disable();
+        } else {
+            this.enable();
+        }
+    }
+
+    protected onToggleService(): void { }
 }

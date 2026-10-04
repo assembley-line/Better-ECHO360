@@ -1,5 +1,5 @@
-import { Service } from "@/services";
-import waitForElement from "@/tools/waitForElement";
+import { SoftService } from "@/services";
+import Toolbar from "./toolbar";
 
 interface Cue {
     startMs: number;
@@ -15,7 +15,7 @@ interface RetrievedCue {
     end: number;
 }
 
-export class CaptionsService extends Service {
+export class CaptionsService extends SoftService {
     private static readonly wrapperId = "better-echo360-caption-wrapper";
     private static readonly boxId = "better-echo360-captions";
 
@@ -45,8 +45,17 @@ export class CaptionsService extends Service {
 
         this.transcriptAvailable = true;
         this.cues = this.getAllCues();
+        this.UI_AttachButtonToToolbar();
 
         this.attach();
+    }
+
+    protected onToggleService(): void {
+        if (this.enabled) {
+            this.attach();
+        } else {
+            this.destroy();
+        }
     }
 
     // Fetching cues logic
@@ -109,7 +118,6 @@ export class CaptionsService extends Service {
         }
         this.reporter.tell("Attaching captions box");
         this.captionsBox = this.setupCaptionBox();
-        this.UI_AttachButtonToToolbar();
 
         this.unsub = this.playerStore.subscribe((state: any) => {
             const timestamp = state.currentTime;
@@ -177,35 +185,15 @@ export class CaptionsService extends Service {
     }
 
     private async UI_AttachButtonToToolbar(): Promise<void> {
-        // Use the fullscreen toggle to find the toolbar
-        const toolbarItemId = "fullscreen-toggle-btn"
+        const toolbar = new Toolbar();
+        const button = await toolbar.addIconButton(["ph", "ph-closed-captioning"]);
+        if (!button) { return }
 
-        // Wait for it to appear
-        const fullscreenButton = await waitForElement(`#${toolbarItemId}`)
-        if (!fullscreenButton) {
-            this.reporter.warn("Could not find the fullscreen button to attach the captions button.");
-            return;
-        }
-
-        const toolbar = fullscreenButton.parentElement;
-
-        if (!toolbar) {
-            this.reporter.warn("Could not find the toolbar to attach the captions button.");
-            return;
-        }
-
-        const captionsIconButton = document.createElement("button");
-        captionsIconButton.toggleAttribute("data-enabled", true);
-        const icon = document.createElement("i");
-        icon.classList.add("ph", "ph-closed-captioning");
-        captionsIconButton.appendChild(icon);
-        captionsIconButton.classList.add("icon-button-captions")
-
-        captionsIconButton.addEventListener("click", () => {
-            captionsIconButton.toggleAttribute("data-enabled")
+        button.toggleAttribute('data-enabled', this.enabled)
+        button.addEventListener("click", () => {
+            this.toggle()
+            button.toggleAttribute("data-enabled", this.enabled)
         })
-
-        toolbar.prepend(captionsIconButton)
     }
 
     public destroy(): void {

@@ -1,6 +1,6 @@
 import lesson from "@/routes/lesson";
 import LessonList from "@/routes/lesson_list";
-import { Service } from "@/services";
+import { HardService } from "@/services";
 
 type MatchResult<T> = { matches: true; data: T } | { matches: false };
 
@@ -10,7 +10,7 @@ interface Route<T = void> {
     handler: (data: T) => void;
 }
 
-export class RouterService extends Service {
+export class RouterService extends HardService {
     private static routes: Route<any>[] = [
         {
             name: "Lesson",

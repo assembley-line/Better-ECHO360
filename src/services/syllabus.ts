@@ -1,4 +1,4 @@
-import { Service } from "@/services";
+import { HardService } from "@/services";
 import {
     literal,
     object,
@@ -42,7 +42,7 @@ const SyllabusListSchema = array(SyllabusItemSchema);
 
 type SyllabusList = InferOutput<typeof SyllabusListSchema>;
 
-export class SyllabusService extends Service {
+export class SyllabusService extends HardService {
     private items: SyllabusList = [];
 
     constructor(private courseId: string) {
