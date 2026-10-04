@@ -1,6 +1,5 @@
 import rawStyles from "@/style.css?inline";
 
-import { grabStore } from "./routes/lesson";
 import { RouterService } from "./services/router";
 
 declare global {
@@ -58,7 +57,6 @@ declare global {
         });
     }
 
-    window.grabStore = grabStore;
     window.betterCandidates = betterCandidates;
 })();
 
