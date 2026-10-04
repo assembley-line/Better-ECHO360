@@ -1,4 +1,5 @@
 import { Reporter } from "@/logging/reporter";
+import Hacker, { ZustandStore } from "@/services/hacker";
 
 export abstract class Service {
     protected readonly reporter: Reporter;
@@ -39,4 +40,30 @@ export abstract class SoftService extends Service {
     }
 
     protected onToggleService(): void { }
+}
+
+export abstract class StoreService extends SoftService {
+    protected closed: boolean = false;
+    protected readonly dependencies: ZustandStore[];
+
+    protected constructor(name: string, dependencies: ZustandStore[]) {
+        super(name);
+        this.dependencies = dependencies;
+
+        for (const dependency of dependencies) {
+            if (!Hacker.grab(dependency)) {
+                this.reporter.warn("Failed to resolve all dependencies, closing service")
+                this.close()
+                return
+            }
+        }
+    }
+
+    protected close(): void {
+        this.reporter.scream("Service has been closed")
+        this.closed = true;
+        this.onCloseService()
+    }
+
+    protected onCloseService(): void { }
 }
