@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better ECHO360
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0-alpha
+// @version      1.0.0-beta
 // @author       CharlieR
 // @description  Enhances the ECHO360 experience with additional features.
 // @icon         https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png
@@ -14,15 +14,16 @@
 
 (function() {
 	"use strict";
-	var style_default = ":root{--primary-color:#d5006c;--primary-color-faded:#ffcce6}.be360-highlight-ring{isolation:isolate;border:7px solid var(--primary-color);box-sizing:border-box;pointer-events:none;z-index:2147483647;opacity:0;border-radius:7px;animation:1.5s ease-in-out forwards be360-ring-pulse;position:fixed}@keyframes be360-ring-pulse{0%{opacity:0}15%{opacity:1}85%{opacity:1}to{opacity:0}}.syllabus-options-box{border-radius:30px;border-end-end-radius:0;z-index:9999;color:#789;background-color:#f7f7f7;border:1px solid #eee1e3;border-bottom-left-radius:0;flex-direction:column;align-items:center;gap:10px;padding:10px 10px 15px;font-size:14px;animation:.35s cubic-bezier(.34,1.56,.64,1) forwards platform-pop-in;display:flex;position:fixed;bottom:0;right:10px;box-shadow:0 5px 15px #0000004d}@keyframes platform-pop-in{0%{transform:translateY(40px)scale(.9)}to{transform:translateY(0)scale(1)}}.syllabus-button-group{flex-direction:row;gap:2px;width:440px;display:flex}.watch-button{background-color:var(--primary-color);color:#fff;cursor:pointer;border:none;border-radius:5px 20px 20px 5px;flex:1;height:40px;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.jump-button{background-color:var(--primary-color-faded);height:40px;color:var(--primary-color);cursor:pointer;font-weight:semibold;border:none;border-radius:20px 5px 5px 20px;flex:1;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.options-button{aspect-ratio:1;background-color:#dcdcdc;border:none;border-radius:20px;justify-content:center;align-items:center;height:40px;margin-left:6px;transition:all .8s cubic-bezier(.34,1,.64,1);display:flex;position:relative}.jump-button:hover,.watch-button:hover{flex:1.25}.options-button:hover{rotate:180deg}";
+	var style_default = ":root{--primary-color:#d5006c;--primary-color-darker:#b3005c;--primary-color-faded:#ffcce6}.be360-highlight-ring{isolation:isolate;border:7px solid var(--primary-color);box-sizing:border-box;pointer-events:none;z-index:2147483647;opacity:0;border-radius:7px;animation:1.5s ease-in-out forwards be360-ring-pulse;position:fixed}@keyframes be360-ring-pulse{0%{opacity:0}15%{opacity:1}85%{opacity:1}to{opacity:0}}.syllabus-options-box{border-radius:30px;border-end-end-radius:0;z-index:9999;color:#789;background-color:#f7f7f7;border:1px solid #eee1e3;border-bottom-left-radius:0;flex-direction:column;align-items:center;gap:10px;padding:10px 10px 15px;font-size:14px;animation:.35s cubic-bezier(.34,1.56,.64,1) forwards platform-pop-in;display:flex;position:fixed;bottom:0;right:10px;box-shadow:0 5px 15px #0000004d}@keyframes platform-pop-in{0%{transform:translateY(40px)scale(.9)}to{transform:translateY(0)scale(1)}}.syllabus-button-group{flex-direction:row;gap:2px;width:440px;display:flex}.watch-button{background-color:var(--primary-color);color:#fff;cursor:pointer;border:none;border-radius:5px 20px 20px 5px;flex:1;height:40px;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.jump-button{background-color:var(--primary-color-faded);height:40px;color:var(--primary-color);cursor:pointer;font-weight:semibold;border:none;border-radius:20px 5px 5px 20px;flex:1;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.options-button{aspect-ratio:1;background-color:#dcdcdc;border:none;border-radius:20px;justify-content:center;align-items:center;height:40px;margin-left:6px;transition:all .8s cubic-bezier(.34,1,.64,1);display:flex;position:relative}.jump-button:hover,.watch-button:hover{flex:1.25}.options-button:hover{rotate:180deg}.icon-button-captions{aspect-ratio:1;color:#fff;cursor:pointer;background:0 0;border:none;border-radius:2px;justify-content:center;align-items:center;height:2rem;padding:4px;font-size:22px;display:flex}.icon-button-captions:hover{color:#000;background:#fff}.icon-button-captions:active{color:#000;background:#ffffff80}.icon-button-captions:focus:not(:focus-visible){outline:none}.icon-button-captions[data-enabled]{background:var(--primary-color);color:#fff}.icon-button-captions[data-enabled]:hover{background:var(--primary-color-darker)}";
 	var Reporter = class Reporter {
+		static REPORT_ATTACHES = false;
 		name;
 		constructor(name) {
 			this.name = name;
 		}
 		static prefix = "Better ECHO360";
 		init() {
-			this.tell("Reporter attached");
+			if (Reporter.REPORT_ATTACHES) this.report("Reporter attached");
 		}
 		stamp(input) {
 			return `[${Reporter.prefix}] [${this.name}] ${input}`;
@@ -40,34 +41,240 @@
 			console.error(this.stamp(message));
 		}
 	};
+	function enumName(enumObj, value) {
+		return Object.keys(enumObj).find((k) => !/^\d+$/.test(k) && enumObj[k] === value);
+	}
+	var ZustandStore = function(ZustandStore) {
+		ZustandStore["PlayerStore"] = "playbackRate";
+		ZustandStore["TranscriptStore"] = "transcripts";
+		return ZustandStore;
+	}({});
+	var HackerService = class HackerService {
+		static stores = {};
+		static _reporter = null;
+		static get reporter() {
+			if (!HackerService._reporter) {
+				HackerService._reporter = new Reporter("Hacker");
+				HackerService._reporter.init();
+			}
+			return HackerService._reporter;
+		}
+		constructor() {}
+		static grab(store) {
+			const cached = HackerService.stores[store];
+			if (cached) return cached;
+			const found = HackerService.findStore(store);
+			if (found) HackerService.stores[store] = found;
+			return found;
+		}
+		static findStore(store) {
+			var prefix = `(${enumName(ZustandStore, store)}) `;
+			HackerService.reporter.report(prefix + "Finding");
+			var req = window.__cr;
+			if (!req) {
+				var chunkNames = [];
+				Object.keys(window).forEach(function(k) {
+					if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k)) chunkNames.push(k);
+				});
+				for (var n = 0; n < chunkNames.length; n++) {
+					var arr = window[chunkNames[n]];
+					if (!Array.isArray(arr)) continue;
+					try {
+						arr.push([
+							[],
+							{ __grabber__: function(module, exports, __webpack_require__) {
+								window.__cr = __webpack_require__;
+							} },
+							[["__grabber__"]]
+						]);
+					} catch (e) {}
+					if (window.__cr) {
+						req = window.__cr;
+						break;
+					}
+				}
+			}
+			if (!req) {
+				this.reporter.warn("Could not capture webpack require — no webpackJsonp/webpackChunk array found");
+				return null;
+			}
+			var cache = req.c;
+			var candidates = [];
+			for (var id in cache) {
+				var exp;
+				try {
+					exp = cache[id] && cache[id].exports;
+				} catch (e) {
+					continue;
+				}
+				if (!exp) continue;
+				var values;
+				try {
+					values = [exp, exp.default].concat(Object.values(exp));
+				} catch (e) {
+					continue;
+				}
+				for (var i = 0; i < values.length; i++) {
+					var val = values[i];
+					try {
+						if (val && typeof val.getState === "function" || typeof val.setState === "function") candidates.push(val);
+					} catch (e) {}
+				}
+			}
+			this.reporter.report(prefix + "Found: " + candidates.length + " candidates");
+			var match = candidates.find(function(s) {
+				try {
+					return store.valueOf() in s.getState();
+				} catch (e) {
+					return false;
+				}
+			});
+			if (!match) {
+				this.reporter.warn(prefix + "No matches found, look to window.__candidates for more");
+				window.__candidates = candidates;
+			}
+			this.reporter.report(prefix + "Found store");
+			return match || null;
+		}
+	};
 	var Service = class {
 		reporter;
 		constructor(name) {
 			this.reporter = new Reporter(name);
+			this.reporter.init();
 		}
 	};
-	var CaptionsService = class CaptionsService extends Service {
+	var HardService = class extends Service {};
+	var SoftService = class extends Service {
+		enabled;
+		constructor(name) {
+			super(name);
+			this.enabled = true;
+		}
+		enable() {
+			this.reporter.tell("Service has been enabled");
+			this.enabled = true;
+			this.onToggleService();
+		}
+		disable() {
+			this.reporter.tell("Service has been disabled");
+			this.enabled = false;
+			this.onToggleService();
+		}
+		toggle() {
+			if (this.enabled) this.disable();
+			else this.enable();
+		}
+		onToggleService() {}
+	};
+	var StoreService = class extends SoftService {
+		closed = false;
+		dependencies;
+		constructor(name, dependencies) {
+			super(name);
+			this.dependencies = dependencies;
+			for (const dependency of dependencies) if (!HackerService.grab(dependency)) {
+				this.reporter.warn("Failed to resolve all dependencies, closing service");
+				this.close();
+				return;
+			}
+		}
+		close() {
+			this.reporter.scream("Service has been closed");
+			this.closed = true;
+			this.onCloseService();
+		}
+		onCloseService() {}
+	};
+	function waitForElement(selector, timeoutMs = 1e4) {
+		return new Promise((resolve) => {
+			function start() {
+				const existing = document.querySelector(selector);
+				if (existing && existing instanceof HTMLElement) {
+					resolve(existing);
+					return;
+				}
+				let settled = false;
+				const observer = new MutationObserver(() => {
+					const el = document.querySelector(selector);
+					if (el && !settled && el instanceof HTMLElement) {
+						settled = true;
+						observer.disconnect();
+						clearTimeout(timeout);
+						resolve(el);
+					}
+				});
+				observer.observe(document.body, {
+					childList: true,
+					subtree: true
+				});
+				const timeout = setTimeout(() => {
+					if (settled) return;
+					settled = true;
+					observer.disconnect();
+					resolve(null);
+				}, timeoutMs);
+			}
+			if (document.body) start();
+			else document.addEventListener("DOMContentLoaded", start, { once: true });
+		});
+	}
+	var Toolbar = class Toolbar extends HardService {
+		static locating = null;
+		constructor() {
+			super("Toolbar");
+			this.locate();
+		}
+		locate() {
+			return Toolbar.locating ??= (async () => {
+				const fullscreenButton = await waitForElement("#fullscreen-toggle-btn");
+				if (!fullscreenButton) {
+					this.reporter.warn("Could not find the fullscreen button to locate the toolbar.");
+					return null;
+				}
+				const toolbar = fullscreenButton.parentElement;
+				if (!toolbar) {
+					this.reporter.warn("Could not find the toolbar element.");
+					return null;
+				}
+				return toolbar;
+			})();
+		}
+		getElement() {
+			return this.locate();
+		}
+		async addIconButton(iconClasses, handler) {
+			const toolbar = await this.getElement();
+			if (!toolbar) return;
+			const iconButton = document.createElement("button");
+			const icon = document.createElement("i");
+			icon.classList.add(...iconClasses);
+			iconButton.appendChild(icon);
+			iconButton.classList.add("icon-button-captions");
+			if (handler) iconButton.addEventListener("click", handler);
+			toolbar.prepend(iconButton);
+			return iconButton;
+		}
+	};
+	var CaptionsService = class CaptionsService extends StoreService {
 		static wrapperId = "better-echo360-caption-wrapper";
 		static boxId = "better-echo360-captions";
-		transcriptAvailable = false;
 		currentCueEnd = -1;
 		captionsBox = null;
 		unsub = null;
-		transcriptStore;
-		playerStore;
 		constructor() {
-			super("Captions");
+			super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
+			if (this.closed) return;
+			this.init();
 		}
 		init() {
-			this.transcriptStore = window.transcriptStore;
-			this.playerStore = window.playerStore;
-			if (!this.transcriptStore || !this.playerStore) {
-				this.reporter.scream("Couldn't access the player or transcript store, check window.player/transcriptStore for more. Aborting");
-				return;
-			}
-			this.transcriptAvailable = true;
 			this.cues = this.getAllCues();
+			this.UI_AttachButtonToToolbar();
 			this.attach();
+		}
+		onToggleService() {
+			if (this.enabled) this.attach();
+			else this.destroy();
 		}
 		cues = null;
 		fetchCount = 0;
@@ -80,13 +287,9 @@
 				return null;
 			}
 			this.fetchCount += 1;
-			return this.transcriptStore.getState().transcripts || null;
+			return HackerService.grab(ZustandStore.TranscriptStore).getState().transcripts || null;
 		}
 		getCueFromTimestamp(timestamp) {
-			if (!this.transcriptAvailable) {
-				this.reporter.tell("Tried to call getCueFromTimestamp without transcript available, returning null.");
-				return null;
-			}
 			if (!this.cues) {
 				if (this.stopFetching) return null;
 				this.cues = this.getAllCues();
@@ -103,10 +306,9 @@
 			return null;
 		}
 		attach() {
-			if (!this.transcriptAvailable) return;
 			this.reporter.tell("Attaching captions box");
 			this.captionsBox = this.setupCaptionBox();
-			this.unsub = this.playerStore.subscribe((state) => {
+			this.unsub = HackerService.grab(ZustandStore.PlayerStore).subscribe((state) => {
 				const timestamp = state.currentTime;
 				if (timestamp < this.currentCueEnd) return;
 				const cue = this.getCueFromTimestamp(timestamp);
@@ -156,6 +358,15 @@
 			attach();
 			return box;
 		}
+		async UI_AttachButtonToToolbar() {
+			const button = await new Toolbar().addIconButton(["ph", "ph-closed-captioning"]);
+			if (!button) return;
+			button.toggleAttribute("data-enabled", this.enabled);
+			button.addEventListener("click", () => {
+				this.toggle();
+				button.toggleAttribute("data-enabled", this.enabled);
+			});
+		}
 		destroy() {
 			if (this.unsub) {
 				this.unsub();
@@ -164,81 +375,18 @@
 			document.getElementById(CaptionsService.wrapperId)?.remove();
 		}
 	};
-	function grabStore(selector) {
-		var req = window.__cr;
-		if (!req) {
-			var chunkNames = [];
-			Object.keys(window).forEach(function(k) {
-				if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k)) chunkNames.push(k);
-			});
-			for (var n = 0; n < chunkNames.length; n++) {
-				var arr = window[chunkNames[n]];
-				if (!Array.isArray(arr)) continue;
-				try {
-					arr.push([
-						[],
-						{ __grabber__: function(module, exports, __webpack_require__) {
-							window.__cr = __webpack_require__;
-						} },
-						[["__grabber__"]]
-					]);
-				} catch (e) {}
-				if (window.__cr) {
-					req = window.__cr;
-					break;
-				}
-			}
+	var TimeMachineService = class extends StoreService {
+		constructor() {
+			super("Time Machine", [ZustandStore.PlayerStore]);
+			if (this.closed) return;
+			this.setupShopInTheHeader();
 		}
-		if (!req) {
-			console.log("[grabStore] could not capture webpack require — no webpackJsonp/webpackChunk array found");
-			return null;
-		}
-		var cache = req.c;
-		var candidates = [];
-		for (var id in cache) {
-			var exp;
-			try {
-				exp = cache[id] && cache[id].exports;
-			} catch (e) {
-				continue;
-			}
-			if (!exp) continue;
-			var values;
-			try {
-				values = [exp, exp.default].concat(Object.values(exp));
-			} catch (e) {
-				continue;
-			}
-			for (var i = 0; i < values.length; i++) {
-				var val = values[i];
-				try {
-					if (val && typeof val.getState === "function" || typeof val.setState === "function") candidates.push(val);
-				} catch (e) {}
-			}
-		}
-		console.log("[grabStore] candidates found:", candidates.length);
-		var match = candidates.find(function(s) {
-			try {
-				return selector in s.getState();
-			} catch (e) {
-				return false;
-			}
-		});
-		if (!match) {
-			console.log("[grabStore] no store found containing key \"" + selector + "\". Inspect window.__candidates for all", candidates.length, "matches.");
-			window.__candidates = candidates;
-		}
-		return match || null;
-	}
-	function lesson() {
-		const displayBoxId = "better-echo360-box";
-		const selectorKey = "playbackRate";
-		const transcriptSelectorKey = "transcripts";
-		const paddingOffset = 4;
-		function setupShopInTheHeader() {
+		displayBoxId = "better-echo360-box";
+		paddingOffset = 4;
+		setupShopInTheHeader() {
 			const selections = document.getElementsByClassName("header");
 			var box = document.createElement("div");
-			box.id = displayBoxId;
+			box.id = this.displayBoxId;
 			if (selections.length == 0) {
 				console.error("No header found");
 				box.style.cssText = [
@@ -248,38 +396,38 @@
 					"z-index:2147483647",
 					"padding:0px"
 				].join(";");
-				function attach() {
+				const attach = () => {
 					if (document.body) {
 						document.body.appendChild(box);
-						createSpeedSelector(box).onChange(function(item) {
-							window.setPlaybackSpeed(item.speed);
+						this.createSpeedSelector(box).onChange((item) => {
+							this.setPlaybackSpeed(item.speed);
 						});
 					} else document.addEventListener("DOMContentLoaded", attach, { once: true });
-				}
+				};
 				attach();
 			} else {
 				const header = selections[0];
-				const boxHeight = header.offsetHeight - 8;
+				const boxHeight = header.offsetHeight - 2 * this.paddingOffset;
 				box.style.cssText = [
 					"position:fixed",
-					`top:${paddingOffset}px`,
-					`right:${paddingOffset}px`,
+					`top:${this.paddingOffset}px`,
+					`right:${this.paddingOffset}px`,
 					"z-index:2147483647",
 					"padding:0px",
 					`height:${boxHeight}px`
 				].join(";");
-				function attach() {
+				const attach = () => {
 					if (document.body) {
 						header.appendChild(box);
-						createSpeedSelector(box).onChange(function(item) {
-							window.setPlaybackSpeed(item.speed);
+						this.createSpeedSelector(box).onChange((item) => {
+							this.setPlaybackSpeed(item.speed);
 						});
 					} else document.addEventListener("DOMContentLoaded", attach, { once: true });
-				}
+				};
 				attach();
 			}
 		}
-		function createSpeedSelector(container) {
+		createSpeedSelector(container) {
 			if (!document.getElementById("seg-styles")) {
 				var style = document.createElement("style");
 				style.id = "seg-styles";
@@ -388,44 +536,21 @@
 				}
 			};
 		}
-		function patchIntoPlayerStore() {
-			var match = grabStore(selectorKey);
-			if (match) {
-				window.playerStore = match;
-				console.log("[grabStore] playerStore set on window. Try: playerStore.getState()");
-				return true;
-			}
-			return false;
-		}
-		function patchIntoTranscriptStore() {
-			var match = grabStore(transcriptSelectorKey);
-			if (match) {
-				window.transcriptStore = match;
-				console.log("[grabStore] transcriptStore set on window. Try: transcriptStore.getState()");
-				return true;
-			}
-			return false;
-		}
-		function setPlaybackSpeed(speed) {
+		setPlaybackSpeed(speed) {
 			var targetSpeed = speed || 1;
-			if (!window.playerStore) {
-				console.error("Issue grabbing playerStore!");
-				return;
-			}
 			try {
-				window.playerStore.getState().onPlaybackRateChange(targetSpeed);
+				HackerService.grab(ZustandStore.PlayerStore).getState().onPlaybackRateChange(targetSpeed);
 			} catch (e) {
-				console.error("Better ECHO360 - Something went wrong on rate change");
+				this.reporter.scream("Something went wrong on rate change");
 				console.error(e);
 			}
 		}
+	};
+	function lesson() {
 		window.addEventListener("load", function() {
-			var patchResult = patchIntoPlayerStore();
-			patchIntoTranscriptStore();
-			if (patchResult) setupShopInTheHeader();
-			new CaptionsService().init();
+			new TimeMachineService();
+			new CaptionsService();
 		});
-		window.setPlaybackSpeed = setPlaybackSpeed;
 	}
 	var DEFAULT_CONFIG = {
 		lang: void 0,
@@ -705,7 +830,7 @@
 		startDate: input.lesson.captureStartedAt ?? input.lesson.startTimeUTC,
 		endDate: input.lesson.captureEndedAt ?? input.lesson.endTimeUTC
 	}))));
-	var SyllabusService = class extends Service {
+	var SyllabusService = class extends HardService {
 		courseId;
 		items = [];
 		constructor(courseId) {
@@ -748,39 +873,6 @@
 			return this.findLessonsByDate(today);
 		}
 	};
-	function waitForElement(selector, timeoutMs = 1e4) {
-		return new Promise((resolve) => {
-			function start() {
-				const existing = document.querySelector(selector);
-				if (existing && existing instanceof HTMLElement) {
-					resolve(existing);
-					return;
-				}
-				let settled = false;
-				const observer = new MutationObserver(() => {
-					const el = document.querySelector(selector);
-					if (el && !settled && el instanceof HTMLElement) {
-						settled = true;
-						observer.disconnect();
-						clearTimeout(timeout);
-						resolve(el);
-					}
-				});
-				observer.observe(document.body, {
-					childList: true,
-					subtree: true
-				});
-				const timeout = setTimeout(() => {
-					if (settled) return;
-					settled = true;
-					observer.disconnect();
-					resolve(null);
-				}, timeoutMs);
-			}
-			if (document.body) start();
-			else document.addEventListener("DOMContentLoaded", start, { once: true });
-		});
-	}
 	function LessonList(courseId) {
 		const syllabus = new SyllabusService(courseId);
 		syllabus.init().then((success) => {
@@ -870,7 +962,7 @@
 			return ring;
 		}
 	}
-	var RouterService = class RouterService extends Service {
+	var RouterService = class RouterService extends HardService {
 		static routes = [{
 			name: "Lesson",
 			matcher: (location) => {
@@ -922,6 +1014,18 @@
 			style.id = "be360-styles";
 			style.textContent = style_default;
 			document.head.appendChild(style);
+			const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
+			function injectStylesheet(href) {
+				const link = document.createElement("link");
+				link.rel = "stylesheet";
+				link.type = "text/css";
+				link.href = href;
+				document.head.appendChild(link);
+				console.log("Injected stylesheet for: ", href);
+				return link;
+			}
+			injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
+			injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
 		}
 		injectStyles();
 		new RouterService().init();
@@ -940,7 +1044,6 @@
 				}
 			});
 		}
-		window.grabStore = grabStore;
 		window.betterCandidates = betterCandidates;
 	})();
 })();
