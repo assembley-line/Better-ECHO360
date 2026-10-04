@@ -1,4 +1,6 @@
 export class Reporter {
+    private static readonly REPORT_ATTACHES: boolean = false;
+
     public readonly name: string;
     constructor(name: string) {
         this.name = name;
@@ -7,7 +9,9 @@ export class Reporter {
     private static prefix = "Better ECHO360";
 
     init(): void {
-        this.report("Reporter attached");
+        if (Reporter.REPORT_ATTACHES) {
+            this.report("Reporter attached");
+        }
     }
 
     private stamp(input: string): string {
