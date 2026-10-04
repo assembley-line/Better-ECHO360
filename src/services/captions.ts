@@ -1,5 +1,7 @@
-import { SoftService } from "@/services";
+import { StoreService } from "@/services";
+import Hacker from "./hacker";
 import Toolbar from "./toolbar";
+import { ZustandStore } from "./hacker";
 
 interface Cue {
     startMs: number;
@@ -15,35 +17,23 @@ interface RetrievedCue {
     end: number;
 }
 
-export class CaptionsService extends SoftService {
+export class CaptionsService extends StoreService {
     private static readonly wrapperId = "better-echo360-caption-wrapper";
     private static readonly boxId = "better-echo360-captions";
-
-    private transcriptAvailable = false;
 
     private currentCueEnd = -1;
     private captionsBox: HTMLElement | null = null;
     private unsub: (() => void) | null = null;
 
-    private transcriptStore: any;
-    private playerStore: any;
-
     constructor() {
-        super("Captions");
+        super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
+
+        if (this.closed) { return }
+        this.init()
     }
 
     // Check if the captions service can function, if not, report unavailable
-    public init(): void {
-        this.transcriptStore = window.transcriptStore;
-        this.playerStore = window.playerStore;
-        if (!this.transcriptStore || !this.playerStore) {
-            this.reporter.scream(
-                "Couldn't access the player or transcript store, check window.player/transcriptStore for more. Aborting",
-            );
-            return;
-        }
-
-        this.transcriptAvailable = true;
+    private init(): void {
         this.cues = this.getAllCues();
         this.UI_AttachButtonToToolbar();
 
@@ -74,17 +64,10 @@ export class CaptionsService extends SoftService {
         }
 
         this.fetchCount += 1;
-        return (this.transcriptStore.getState().transcripts as Cue[]) || null;
+        return (Hacker.grab(ZustandStore.TranscriptStore).getState().transcripts as Cue[]) || null;
     }
 
     private getCueFromTimestamp(timestamp: number): RetrievedCue | null {
-        if (!this.transcriptAvailable) {
-            this.reporter.tell(
-                "Tried to call getCueFromTimestamp without transcript available, returning null.",
-            );
-            return null;
-        }
-
         // If the transcript has been patched but cues are still null, try to grab them
         // again as the API may take some more time
         if (!this.cues) {
@@ -113,13 +96,10 @@ export class CaptionsService extends SoftService {
     }
 
     private attach(): void {
-        if (!this.transcriptAvailable) {
-            return;
-        }
         this.reporter.tell("Attaching captions box");
         this.captionsBox = this.setupCaptionBox();
 
-        this.unsub = this.playerStore.subscribe((state: any) => {
+        this.unsub = Hacker.grab(ZustandStore.PlayerStore).subscribe((state: any) => {
             const timestamp = state.currentTime;
 
             if (timestamp < this.currentCueEnd) {
