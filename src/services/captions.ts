@@ -1,4 +1,5 @@
 import { Service } from "@/services";
+import waitForElement from "@/tools/waitForElement";
 
 interface Cue {
     startMs: number;
@@ -108,6 +109,7 @@ export class CaptionsService extends Service {
         }
         this.reporter.tell("Attaching captions box");
         this.captionsBox = this.setupCaptionBox();
+        this.UI_AttachButtonToToolbar();
 
         this.unsub = this.playerStore.subscribe((state: any) => {
             const timestamp = state.currentTime;
@@ -172,6 +174,38 @@ export class CaptionsService extends Service {
         attach();
 
         return box;
+    }
+
+    private async UI_AttachButtonToToolbar(): Promise<void> {
+        // Use the fullscreen toggle to find the toolbar
+        const toolbarItemId = "fullscreen-toggle-btn"
+
+        // Wait for it to appear
+        const fullscreenButton = await waitForElement(`#${toolbarItemId}`)
+        if (!fullscreenButton) {
+            this.reporter.warn("Could not find the fullscreen button to attach the captions button.");
+            return;
+        }
+
+        const toolbar = fullscreenButton.parentElement;
+
+        if (!toolbar) {
+            this.reporter.warn("Could not find the toolbar to attach the captions button.");
+            return;
+        }
+
+        const captionsIconButton = document.createElement("button");
+        captionsIconButton.toggleAttribute("data-enabled", true);
+        const icon = document.createElement("i");
+        icon.classList.add("ph", "ph-closed-captioning");
+        captionsIconButton.appendChild(icon);
+        captionsIconButton.classList.add("icon-button-captions")
+
+        captionsIconButton.addEventListener("click", () => {
+            captionsIconButton.toggleAttribute("data-enabled")
+        })
+
+        toolbar.prepend(captionsIconButton)
     }
 
     public destroy(): void {

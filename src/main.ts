@@ -22,6 +22,21 @@ declare global {
         style.id = "be360-styles";
         style.textContent = rawStyles;
         document.head.appendChild(style);
+
+        const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
+
+        function injectStylesheet(href: string): HTMLLinkElement {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.type = "text/css";
+          link.href = href;
+            document.head.appendChild(link);
+            console.log("Injected stylesheet for: ", href)
+            return link;
+        }
+
+        injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
+        injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
     }
     injectStyles();
 
