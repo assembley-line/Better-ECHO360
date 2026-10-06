@@ -1,6 +1,10 @@
 import { Reporter } from "@/logging/reporter";
 import enumName from "@/tools/enumName";
 
+import { unsafeWindow } from "$";
+
+const w = unsafeWindow as Window;
+
 export enum ZustandStore {
     PlayerStore = "playbackRate",
     TranscriptStore = "transcripts",
@@ -39,16 +43,16 @@ export default class HackerService {
         var storeName = enumName(ZustandStore, store);
         var prefix = `(${storeName}) `
         HackerService.reporter.report(prefix + "Finding");
-        var req = window.__cr;
+        var req = w.__cr;
         if (!req) {
             var chunkNames: string[] = [];
-            Object.keys(window).forEach(function (k) {
+            Object.keys(w).forEach(function (k) {
                 if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k))
                     chunkNames.push(k);
             });
 
             for (var n = 0; n < chunkNames.length; n++) {
-                var arr = window[chunkNames[n]];
+                var arr = w[chunkNames[n]];
                 if (!Array.isArray(arr)) continue;
                 try {
                     arr.push([
@@ -61,14 +65,14 @@ export default class HackerService {
                                 exports: any,
                                 __webpack_require__: any,
                             ) {
-                                window.__cr = __webpack_require__;
+                                w.__cr = __webpack_require__;
                             },
                         },
                         [["__grabber__"]],
                     ]);
                 } catch (e) {}
-                if (window.__cr) {
-                    req = window.__cr;
+                if (w.__cr) {
+                    req = w.__cr;
                     break;
                 }
             }
@@ -125,7 +129,7 @@ export default class HackerService {
             }
         });
 
-        window.__candidates = candidates;
+        w.__candidates = candidates;
         if (!match) {
             this.reporter.warn(prefix + "No matches found, look to window.__candidates for more")
         } else {

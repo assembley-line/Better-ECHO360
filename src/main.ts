@@ -1,7 +1,5 @@
 import { RouterService } from "./services/router";
 import { Artist } from "./services/artist";
-import Hacker from "./services/hacker";
-import { ZustandStore } from "./services/hacker";
 
 declare global {
     interface Window {
