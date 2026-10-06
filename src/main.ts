@@ -1,10 +1,12 @@
 import { RouterService } from "./services/router";
 import { Artist } from "./services/artist";
+import { type SettingsShape } from "./tools/settings";
 
 declare global {
     interface Window {
         playerStore: any;
         transcriptStore: any;
+        settings: SettingsShape;
         __cr: any;
         __candidates: any;
         setPlaybackSpeed: any;
@@ -12,14 +14,14 @@ declare global {
     }
 }
 
-(function () {
+(async function () {
     "use strict";
 
     const artist = new Artist();
     artist.paint();
 
     const router = new RouterService();
-    router.init();
+    router.route();
 
 //     const playerStore = Hacker.grab(ZustandStore.PlayerStore)
 //     window.playerStore = playerStore;

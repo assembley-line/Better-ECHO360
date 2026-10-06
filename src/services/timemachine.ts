@@ -1,15 +1,19 @@
 import { StoreService } from "@/services"
 import Hacker, { ZustandStore } from "@/services/hacker"
+import settings from "@/tools/settings"
 
 class TimeMachineService extends StoreService {
     // This class controls and implements a custom speed control for the video player
     // it requires the PlayerStore to be patched into
 
     constructor() {
+        if (settings.timemachine.hidden) { return }
+
         super("Time Machine", [ZustandStore.PlayerStore])
 
         if (this.closed) { return }
         this.setupShopInTheHeader()
+        this.setPlaybackSpeed(settings.timemachine.defaultSpeed)
     }
 
     // LEGACY CODE - To be rewritten

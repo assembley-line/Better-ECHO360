@@ -44,7 +44,7 @@ export class RouterService extends HardService {
         super("Router");
     }
 
-    private route(): void {
+    public route(): void {
         var location = window.location;
 
         for (const route of RouterService.routes) {
@@ -57,9 +57,5 @@ export class RouterService extends HardService {
         }
 
         this.reporter.warn(`No route matched for ${location.pathname}`);
-    }
-
-    public init(): void {
-        this.route();
     }
 }

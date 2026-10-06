@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
                     namespace: "http://tampermonkey.net/",
                     version: "1.0.2",
                     match: ["*://echo360.net.au/*"],
-                    "run-at": "document-start",
+                    "run-at": "document-end",
                     icon: "https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png",
                     grant: ["GM_getValue", "GM_setValue", "unsafeWindow"],
                     downloadURL: `${REPO_DIST}/${fileName}`,
