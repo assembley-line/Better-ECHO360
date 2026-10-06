@@ -10,6 +10,7 @@ export default class HackerService {
     // This class assists other classes with patching into the Zustand store or
     // intercepting network requests. It is a utility class that provides methods for these tasks.
     // It is a custom service as it is used within the service sub-classes and will cause circular import issues
+    // so no extensions are used and the reporter is lazy loaded and manually implemented
 
     private static stores: Partial<Record<ZustandStore, any>> = {};
     private static _reporter: Reporter | null = null; // Lazy load reporter
@@ -124,13 +125,13 @@ export default class HackerService {
             }
         });
 
+        window.__candidates = candidates;
         if (!match) {
             this.reporter.warn(prefix + "No matches found, look to window.__candidates for more")
-            window.__candidates = candidates;
+        } else {
+            this.reporter.report(prefix + "Found store")
         }
 
-
-        this.reporter.report(prefix + "Found store")
         return match || null;
     }
 }

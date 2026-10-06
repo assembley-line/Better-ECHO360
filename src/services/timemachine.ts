@@ -1,7 +1,10 @@
 import { StoreService } from "@/services"
 import Hacker, { ZustandStore } from "@/services/hacker"
 
-export default class TimeMachineService extends StoreService {
+class TimeMachineService extends StoreService {
+    // This class controls and implements a custom speed control for the video player
+    // it requires the PlayerStore to be patched into
+
     constructor() {
         super("Time Machine", [ZustandStore.PlayerStore])
 
@@ -9,14 +12,11 @@ export default class TimeMachineService extends StoreService {
         this.setupShopInTheHeader()
     }
 
-    // This class controls and implements a custom speed control for the video player
-    // it requires the PlayerStore to be patched into
-
     // LEGACY CODE - To be rewritten
     private displayBoxId = "better-echo360-box";
     private paddingOffset = 4;
 
-    public setupShopInTheHeader() {
+    private setupShopInTheHeader() {
         const selections = document.getElementsByClassName("header");
         var box = document.createElement("div");
         box.id = this.displayBoxId;
@@ -81,7 +81,7 @@ export default class TimeMachineService extends StoreService {
         }
     }
 
-    public createSpeedSelector(container: HTMLElement) {
+    private createSpeedSelector(container: HTMLElement) {
         if (!document.getElementById("seg-styles")) {
             var style = document.createElement("style");
             style.id = "seg-styles";
@@ -195,7 +195,7 @@ export default class TimeMachineService extends StoreService {
         };
     }
 
-    public setPlaybackSpeed(speed: number) {
+    private setPlaybackSpeed(speed: number) {
         var targetSpeed = speed || 1; // Default to 1x speed
 
         try {
@@ -208,3 +208,5 @@ export default class TimeMachineService extends StoreService {
         }
     }
 }
+
+export { TimeMachineService as TimeMachine };

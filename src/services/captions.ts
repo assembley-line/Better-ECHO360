@@ -25,6 +25,8 @@ export class CaptionsService extends StoreService {
     private captionsBox: HTMLElement | null = null;
     private unsub: (() => void) | null = null;
 
+    private captionsIconButton: HTMLElement | null = null;
+
     constructor() {
         super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
 
@@ -48,6 +50,11 @@ export class CaptionsService extends StoreService {
         }
     }
 
+    protected onCloseService(): void {
+        this.destroy()
+        this.UI_RemoveButtonFromToolbar()
+    }
+
     // Fetching cues logic
     private cues: Cue[] | null = null;
     private fetchCount: number = 0;
@@ -59,7 +66,7 @@ export class CaptionsService extends StoreService {
             this.reporter.warn(
                 "Max fetch attempts reached for cues, stopping further attempts.",
             );
-            this.stopFetching = true;
+            this.close()
             return null;
         }
 
@@ -174,6 +181,15 @@ export class CaptionsService extends StoreService {
             this.toggle()
             button.toggleAttribute("data-enabled", this.enabled)
         })
+
+        this.captionsIconButton = button
+    }
+
+    private async UI_RemoveButtonFromToolbar(): Promise<void> {
+        if (this.captionsIconButton) {
+            this.captionsIconButton.remove()
+            this.captionsIconButton = null
+        }
     }
 
     public destroy(): void {

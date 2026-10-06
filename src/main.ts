@@ -1,6 +1,8 @@
-import rawStyles from "@/style.css?inline";
-
 import { RouterService } from "./services/router";
+import { Artist } from "./services/artist";
+import settings from "./tools/settings";
+import Hacker from "./services/hacker";
+import { ZustandStore } from "./services/hacker";
 
 declare global {
     interface Window {
@@ -16,31 +18,16 @@ declare global {
 (function () {
     "use strict";
 
-    function injectStyles(): void {
-        const style = document.createElement("style");
-        style.id = "be360-styles";
-        style.textContent = rawStyles;
-        document.head.appendChild(style);
-
-        const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
-
-        function injectStylesheet(href: string): HTMLLinkElement {
-          const link = document.createElement("link");
-          link.rel = "stylesheet";
-          link.type = "text/css";
-          link.href = href;
-            document.head.appendChild(link);
-            console.log("Injected stylesheet for: ", href)
-            return link;
-        }
-
-        injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
-        injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
-    }
-    injectStyles();
+    const artist = new Artist();
+    artist.paint();
 
     const router = new RouterService();
     router.init();
+
+    const playerStore = Hacker.grab(ZustandStore.PlayerStore)
+    window.playerStore = playerStore;
+    const transcriptStore = Hacker.grab(ZustandStore.TranscriptStore)
+    window.transcriptStore = transcriptStore;
 
     function betterCandidates() {
         return window.__candidates.map(function (s: any, i: any) {

@@ -21,7 +21,7 @@ export default defineConfig({
                 version: "1.0.0-beta",
                 "run-at": "document-start",
                 icon: "https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png",
-                grant: "none",
+                grant: ["GM_getValue", "GM_setValue", "unsafeWindow"],
                 downloadURL: "https://github.com/assembley-line/Better-ECHO360/raw/refs/heads/main/dist/better-e360.user.js",
                 updateURL: "https://github.com/assembley-line/Better-ECHO360/raw/refs/heads/main/dist/better-e360.user.js",
             },
