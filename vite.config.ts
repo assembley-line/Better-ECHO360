@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
             __EXPERIMENTAL__: JSON.stringify(experimental),
         },
         build: {
-            emptyOutDir: !experimental,
+            emptyOutDir: false,
         },
         plugins: [
             monkey({

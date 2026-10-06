@@ -243,9 +243,6 @@
 		getElement() {
 			return this.locate();
 		}
-		get element() {
-			return this.getElement();
-		}
 		async addIconButton(iconClasses, handler) {
 			const toolbar = await this.getElement();
 			if (!toolbar) return;
