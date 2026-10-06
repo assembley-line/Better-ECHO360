@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better ECHO360 (Experimental)
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1-beta
+// @version      1.0.2
 // @author       CharlieR
 // @description  Enhances the ECHO360 experience with additional features.
 // @icon         https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png
@@ -99,7 +99,7 @@
 			if (!req) {
 				this.reporter.warn("Could not capture webpack require — no webpackJsonp/webpackChunk array found");
 				return null;
-            }
+			}
 			var cache = req.c;
 			var candidates = [];
 			for (var id in cache) {
@@ -242,6 +242,9 @@
 		}
 		getElement() {
 			return this.locate();
+		}
+		get element() {
+			return this.getElement();
 		}
 		async addIconButton(iconClasses, handler) {
 			const toolbar = await this.getElement();
@@ -438,13 +441,16 @@
 			if (this.enabled) this.UI_attachPhoneWindow();
 			else this.UI_removePhoneWindow();
 		}
-		UI_attachPhoneWindow() {
+		async UI_attachPhoneWindow() {
 			if (this.phoneEl) return;
 			const el = createEmbed(PhoneService.videoUrl, { zoom: 1.05 });
 			if (!el) return;
+			const player = await waitForElement("[data-test-id=\"layout-display-container\"]");
+			if (!player) return;
+			player.style.position = "relative";
 			Object.assign(el.style, {
-				position: "fixed",
-				bottom: "10px",
+				position: "absolute",
+				bottom: `10px`,
 				right: "10px",
 				width: "281px",
 				height: "500px",
@@ -453,7 +459,7 @@
 				boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
 			});
 			this.phoneEl = el;
-			document.body.appendChild(el);
+			player.appendChild(el);
 		}
 		UI_removePhoneWindow() {
 			this.phoneEl?.remove();

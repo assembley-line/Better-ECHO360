@@ -1,5 +1,6 @@
 import { SoftService } from "@/services";
 import Toolbar from "@/services/toolbar";
+import waitForElement from "@/tools/waitForElement";
 import { createEmbed } from "@/tools/youtube";
 
 class PhoneService extends SoftService {
@@ -20,15 +21,20 @@ class PhoneService extends SoftService {
             else this.UI_removePhoneWindow();
         }
 
-        private UI_attachPhoneWindow(): void {
+        private async UI_attachPhoneWindow(): Promise<void> {
             if (this.phoneEl) return;                    // already showing, so a double toggle can't add two
 
             const el = createEmbed(PhoneService.videoUrl, { zoom: 1.05 });
             if (!el) return;
 
+            const player = await waitForElement('[data-test-id="layout-display-container"]')
+            if (!player) return
+
+            player.style.position = "relative";            // ensure the phone window is positioned relative to the player
+
             Object.assign(el.style, {
-                position: "fixed",
-                bottom: "10px",
+                position: "absolute",
+                bottom: `10px`,
                 right: "10px",
                 width: "281px",                          // 9:16 of the height
                 height: "500px",
@@ -38,7 +44,7 @@ class PhoneService extends SoftService {
             });
 
             this.phoneEl = el;
-            document.body.appendChild(el);
+            player.appendChild(el);
         }
 
         private UI_removePhoneWindow(): void {
