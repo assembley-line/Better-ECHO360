@@ -67,17 +67,21 @@ export class SyllabusService extends HardService {
                 return false;
             }
 
-            const syllabusItems = safeParse(SyllabusListSchema, json.data);
-            if (!syllabusItems.success) {
-                this.reporter.warn(
-                    "Failed to parse syllabus items, read below",
-                );
-                console.log(syllabusItems.issues);
-                return false;
+            const parsed: SyllabusList = [];
+            let skipped = 0;
+
+            for (const raw of json.data) {
+                const result = safeParse(SyllabusItemSchema, raw);
+                if (result.success) {
+                    parsed.push(result.output);
+                } else {
+                    skipped++;
+                    console.debug("Skipped syllabus item:", result.issues, raw);
+                }
             }
 
             this.reporter.tell("Successfully read and parsed the syllabus");
-            this.items = syllabusItems.output;
+            this.items = parsed;
             return true;
         } catch (e) {
             this.reporter.scream("Syllabus fetch threw an error: " + e);
