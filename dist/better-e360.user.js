@@ -1,20 +1,21 @@
 // ==UserScript==
 // @name         Better ECHO360
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0-beta
+// @version      1.0.1-beta
 // @author       CharlieR
 // @description  Enhances the ECHO360 experience with additional features.
 // @icon         https://messenger-assets.qualified.com/uploads/7U9KEay8tEHtKtBg3eDboiKsuxNZ8Nez9e2jt/303ad5416775b60078af5eb38a6c20687c530d5f5e5a9ce7cb72df2d11cf86c5.png
 // @downloadURL  https://github.com/assembley-line/Better-ECHO360/raw/refs/heads/main/dist/better-e360.user.js
 // @updateURL    https://github.com/assembley-line/Better-ECHO360/raw/refs/heads/main/dist/better-e360.user.js
 // @match        *://echo360.net.au/*
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        unsafeWindow
 // @run-at       document-start
 // ==/UserScript==
 
 (function() {
 	"use strict";
-	var style_default = ":root{--primary-color:#d5006c;--primary-color-darker:#b3005c;--primary-color-faded:#ffcce6}.be360-highlight-ring{isolation:isolate;border:7px solid var(--primary-color);box-sizing:border-box;pointer-events:none;z-index:2147483647;opacity:0;border-radius:7px;animation:1.5s ease-in-out forwards be360-ring-pulse;position:fixed}@keyframes be360-ring-pulse{0%{opacity:0}15%{opacity:1}85%{opacity:1}to{opacity:0}}.syllabus-options-box{border-radius:30px;border-end-end-radius:0;z-index:9999;color:#789;background-color:#f7f7f7;border:1px solid #eee1e3;border-bottom-left-radius:0;flex-direction:column;align-items:center;gap:10px;padding:10px 10px 15px;font-size:14px;animation:.35s cubic-bezier(.34,1.56,.64,1) forwards platform-pop-in;display:flex;position:fixed;bottom:0;right:10px;box-shadow:0 5px 15px #0000004d}@keyframes platform-pop-in{0%{transform:translateY(40px)scale(.9)}to{transform:translateY(0)scale(1)}}.syllabus-button-group{flex-direction:row;gap:2px;width:440px;display:flex}.watch-button{background-color:var(--primary-color);color:#fff;cursor:pointer;border:none;border-radius:5px 20px 20px 5px;flex:1;height:40px;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.jump-button{background-color:var(--primary-color-faded);height:40px;color:var(--primary-color);cursor:pointer;font-weight:semibold;border:none;border-radius:20px 5px 5px 20px;flex:1;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.options-button{aspect-ratio:1;background-color:#dcdcdc;border:none;border-radius:20px;justify-content:center;align-items:center;height:40px;margin-left:6px;transition:all .8s cubic-bezier(.34,1,.64,1);display:flex;position:relative}.jump-button:hover,.watch-button:hover{flex:1.25}.options-button:hover{rotate:180deg}.icon-button-captions{aspect-ratio:1;color:#fff;cursor:pointer;background:0 0;border:none;border-radius:2px;justify-content:center;align-items:center;height:2rem;padding:4px;font-size:22px;display:flex}.icon-button-captions:hover{color:#000;background:#fff}.icon-button-captions:active{color:#000;background:#ffffff80}.icon-button-captions:focus:not(:focus-visible){outline:none}.icon-button-captions[data-enabled]{background:var(--primary-color);color:#fff}.icon-button-captions[data-enabled]:hover{background:var(--primary-color-darker)}";
 	var Reporter = class Reporter {
 		static REPORT_ATTACHES = false;
 		name;
@@ -44,6 +45,7 @@
 	function enumName(enumObj, value) {
 		return Object.keys(enumObj).find((k) => !/^\d+$/.test(k) && enumObj[k] === value);
 	}
+	var w = (() => typeof unsafeWindow != "undefined" ? unsafeWindow : void 0)();
 	var ZustandStore = function(ZustandStore) {
 		ZustandStore["PlayerStore"] = "playbackRate";
 		ZustandStore["TranscriptStore"] = "transcripts";
@@ -70,26 +72,26 @@
 		static findStore(store) {
 			var prefix = `(${enumName(ZustandStore, store)}) `;
 			HackerService.reporter.report(prefix + "Finding");
-			var req = window.__cr;
+			var req = w.__cr;
 			if (!req) {
 				var chunkNames = [];
-				Object.keys(window).forEach(function(k) {
+				Object.keys(w).forEach(function(k) {
 					if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k)) chunkNames.push(k);
 				});
 				for (var n = 0; n < chunkNames.length; n++) {
-					var arr = window[chunkNames[n]];
+					var arr = w[chunkNames[n]];
 					if (!Array.isArray(arr)) continue;
 					try {
 						arr.push([
 							[],
 							{ __grabber__: function(module, exports, __webpack_require__) {
-								window.__cr = __webpack_require__;
+								w.__cr = __webpack_require__;
 							} },
 							[["__grabber__"]]
 						]);
 					} catch (e) {}
-					if (window.__cr) {
-						req = window.__cr;
+					if (w.__cr) {
+						req = w.__cr;
 						break;
 					}
 				}
@@ -129,11 +131,9 @@
 					return false;
 				}
 			});
-			if (!match) {
-				this.reporter.warn(prefix + "No matches found, look to window.__candidates for more");
-				window.__candidates = candidates;
-			}
-			this.reporter.report(prefix + "Found store");
+			w.__candidates = candidates;
+			if (!match) this.reporter.warn(prefix + "No matches found, look to window.__candidates for more");
+			else this.reporter.report(prefix + "Found store");
 			return match || null;
 		}
 	};
@@ -262,6 +262,7 @@
 		currentCueEnd = -1;
 		captionsBox = null;
 		unsub = null;
+		captionsIconButton = null;
 		constructor() {
 			super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
 			if (this.closed) return;
@@ -276,6 +277,10 @@
 			if (this.enabled) this.attach();
 			else this.destroy();
 		}
+		onCloseService() {
+			this.destroy();
+			this.UI_RemoveButtonFromToolbar();
+		}
 		cues = null;
 		fetchCount = 0;
 		stopFetching = false;
@@ -283,7 +288,7 @@
 		getAllCues() {
 			if (this.fetchCount > this.maxFetchAttempts) {
 				this.reporter.warn("Max fetch attempts reached for cues, stopping further attempts.");
-				this.stopFetching = true;
+				this.close();
 				return null;
 			}
 			this.fetchCount += 1;
@@ -366,6 +371,13 @@
 				this.toggle();
 				button.toggleAttribute("data-enabled", this.enabled);
 			});
+			this.captionsIconButton = button;
+		}
+		async UI_RemoveButtonFromToolbar() {
+			if (this.captionsIconButton) {
+				this.captionsIconButton.remove();
+				this.captionsIconButton = null;
+			}
 		}
 		destroy() {
 			if (this.unsub) {
@@ -373,6 +385,89 @@
 				this.unsub = null;
 			}
 			document.getElementById(CaptionsService.wrapperId)?.remove();
+		}
+	};
+	function youtubeId(input) {
+		let u;
+		try {
+			u = new URL(input);
+		} catch {
+			return null;
+		}
+		const host = u.hostname.replace(/^www\.|^m\./, "");
+		let id = null;
+		if (host === "youtu.be") id = u.pathname.slice(1);
+		else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+			if (u.pathname === "/watch") id = u.searchParams.get("v");
+			else {
+				const m = /^\/(embed|shorts|live)\/([^/?]+)/.exec(u.pathname);
+				id = m ? m[2] : null;
+			}
+		}
+		return id && /^[\w-]{11}$/.test(id) ? id : null;
+	}
+	function createEmbed(url, { zoom = 1, sourceAspect = 16 / 9 } = {}) {
+		const id = youtubeId(url);
+		if (!id) return null;
+		const wrap = document.createElement("div");
+		wrap.style.cssText = "position:relative;overflow:hidden;container-type:size;pointer-events:none;background:#000;";
+		const frame = document.createElement("iframe");
+		frame.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
+		frame.allow = "autoplay; encrypted-media";
+		frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
+		frame.style.cssText = `
+        position:absolute; top:50%; left:50%; border:0;
+        height:${zoom * 100}cqh;
+        width:${zoom * 100 * sourceAspect}cqh;
+        transform:translate(-50%,-50%);
+    `;
+		wrap.appendChild(frame);
+		return wrap;
+	}
+	var PhoneService = class PhoneService extends SoftService {
+		static videoUrl = "https://www.youtube.com/watch?v=_bwtEtYQwgc";
+		button = null;
+		phoneEl = null;
+		constructor() {
+			super("Phone");
+			this.disable();
+			this.UI_attachButton();
+		}
+		onToggleService() {
+			this.button?.toggleAttribute("data-enabled", this.enabled);
+			if (this.enabled) this.UI_attachPhoneWindow();
+			else this.UI_removePhoneWindow();
+		}
+		UI_attachPhoneWindow() {
+			if (this.phoneEl) return;
+			const el = createEmbed(PhoneService.videoUrl, { zoom: 1.05 });
+			if (!el) return;
+			Object.assign(el.style, {
+				position: "fixed",
+				bottom: "10px",
+				right: "10px",
+				width: "281px",
+				height: "500px",
+				zIndex: "10000",
+				borderRadius: "8px",
+				boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
+			});
+			this.phoneEl = el;
+			document.body.appendChild(el);
+		}
+		UI_removePhoneWindow() {
+			this.phoneEl?.remove();
+			this.phoneEl = null;
+		}
+		async UI_attachButton() {
+			const iconClass = "ph-device-mobile-speaker";
+			const toolbar = new Toolbar();
+			this.button = await toolbar.addIconButton(["ph", iconClass]) ?? null;
+			if (!this.button) return;
+			this.button.toggleAttribute("data-enabled", this.enabled);
+			this.button.addEventListener("click", () => {
+				this.toggle();
+			});
 		}
 	};
 	var TimeMachineService = class extends StoreService {
@@ -550,6 +645,7 @@
 		window.addEventListener("load", function() {
 			new TimeMachineService();
 			new CaptionsService();
+			new PhoneService();
 		});
 	}
 	var DEFAULT_CONFIG = {
@@ -1007,43 +1103,34 @@
 			this.route();
 		}
 	};
-	(function() {
-		"use strict";
-		function injectStyles() {
+	var style_default = ":root {\n    --primary-color: #d5006c;\n    --primary-color-darker:#b3005c;\n    --primary-color-faded: #ffcce6;\n}\n\n.be360-highlight-ring {\n    isolation: isolate;\n    position: fixed;\n    border: 7px solid var(--primary-color);\n    border-radius: 7px;\n    box-sizing: border-box;\n    pointer-events: none;\n    z-index: 2147483647;\n    opacity: 0; /* starts invisible, animation takes over from here */\n    animation: be360-ring-pulse 1.5s ease-in-out forwards;\n}\n\n@keyframes be360-ring-pulse {\n    0% {\n        opacity: 0;\n    }\n    15% {\n        opacity: 1;\n    }\n    85% {\n        opacity: 1;\n    }\n    100% {\n        opacity: 0;\n    }\n}\n\n.syllabus-options-box {\n    position: fixed;\n    display: flex;\n    flex-direction: column;\n    bottom: 0px;\n    right: 10px;\n    background-color: #f7f7f7;\n    border: 1px solid #eee1e3;\n    border-radius: 30px;\n    border-end-end-radius: 0px;\n    border-bottom-left-radius: 0px;\n    padding: 10px;\n    padding-bottom: 15px;\n    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);\n    z-index: 9999;\n\n    font-size: 14px;\n    color: lightslategray;\n\n    align-items: center;\n    gap: 10px;\n\n    animation: platform-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;\n}\n\n@keyframes platform-pop-in {\n    0% {\n        transform: translateY(40px) scale(0.9);\n    }\n    100% {\n        transform: translateY(0) scale(1);\n    }\n}\n\n.syllabus-button-group {\n    display: flex;\n    flex-direction: row;\n    gap: 2px;\n    width: 440px;\n}\n\n.watch-button {\n    position: relative;\n    padding: 10px 0;\n    background-color: var(--primary-color);\n    color: #fff;\n    border: none;\n    flex: 1;\n    height: 40px;\n    border-radius: 20px;\n    border-top-left-radius: 5px;\n    border-bottom-left-radius: 5px;\n    cursor: pointer;\n    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);\n}\n\n.jump-button {\n    position: relative;\n    padding: 10px 0;\n    flex: 1;\n    height: 40px;\n    background-color: var(--primary-color-faded);\n    color: var(--primary-color);\n    border: none;\n    border-radius: 20px;\n    border-top-right-radius: 5px;\n    border-bottom-right-radius: 5px;\n    cursor: pointer;\n    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);\n\n    font-weight: semibold;\n}\n\n.options-button {\n    position: relative;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    height: 40px;\n    aspect-ratio: 1;\n    border-radius: 20px;\n    background-color: gainsboro;\n    border: none;\n    margin-left: 6px;\n    transition: all 0.8s cubic-bezier(0.34, 1, 0.64, 1);\n}\n\n.jump-button:hover,\n.watch-button:hover {\n    flex: 1.25;\n}\n\n.options-button:hover {\n    rotate: 180deg;\n}\n\n.icon-button-captions {\n    height: 2rem;\n    aspect-ratio: 1;\n    background: transparent;\n    color: white;\n    border: none;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    padding: 4px;\n    font-size: 22px;\n    border-radius: 2px;\n    cursor: pointer;\n}\n\n.icon-button-captions:hover {\n    background: white;\n    color: black;\n}\n\n.icon-button-captions:active {\n    background: rgba(255, 255, 255, 0.5);\n    color: black;\n}\n\n.icon-button-captions:focus:not(:focus-visible) {\n  outline: none;\n}\n\n.icon-button-captions[data-enabled] {\n    background: var(--primary-color);\n    color: white;\n}\n\n.icon-button-captions[data-enabled]:hover {\n    background: var(--primary-color-darker);\n}\n";
+	var ArtistService = class extends HardService {
+		constructor() {
+			super("Artist");
+		}
+		paint() {
 			const style = document.createElement("style");
 			style.id = "be360-styles";
 			style.textContent = style_default;
+			this.reporter.report("Injected the stylesheet from style.css");
 			document.head.appendChild(style);
 			const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
-			function injectStylesheet(href) {
+			const injectStylesheet = (href) => {
 				const link = document.createElement("link");
 				link.rel = "stylesheet";
 				link.type = "text/css";
 				link.href = href;
 				document.head.appendChild(link);
-				console.log("Injected stylesheet for: ", href);
+				this.reporter.report(`Injected the stylesheet with the href: ${href}`);
 				return link;
-			}
+			};
 			injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
 			injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
 		}
-		injectStyles();
+	};
+	(function() {
+		"use strict";
+		new ArtistService().paint();
 		new RouterService().init();
-		function betterCandidates() {
-			return window.__candidates.map(function(s, i) {
-				try {
-					return {
-						i,
-						state: s.getState()
-					};
-				} catch (e) {
-					return {
-						i,
-						error: e.message || "Unknown error"
-					};
-				}
-			});
-		}
-		window.betterCandidates = betterCandidates;
 	})();
 })();
