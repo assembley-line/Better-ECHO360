@@ -1,5 +1,5 @@
 import { HardService } from "@/services";
-import rawStyles from "@/style.css?raw";
+import rawStyles from "@/style.css?inline";
 
 class ArtistService extends HardService {
     constructor() {
