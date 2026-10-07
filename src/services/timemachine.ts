@@ -7,8 +7,6 @@ class TimeMachineService extends StoreService {
     // it requires the PlayerStore to be patched into
 
     constructor() {
-        if (settings.timemachine.hidden) return;
-
         super("Time Machine", [ZustandStore.PlayerStore]);
 
         if (this.closed) return;

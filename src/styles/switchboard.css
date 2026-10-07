@@ -2,18 +2,57 @@
     background-color: red;
 }
 
-#switchboard.top-bar {
+#switchboard .top-bar {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    height: 40px;
+    margin-bottom: 10px;
 }
 
-#switchboard.top-bar h1 {
-    font-size: 16px;
-    font-weight: 800;
+#switchboard .close-button {
+    height: 35px;
+    width: 35px;
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.05);
+    color: black;
+    border: none;
+    outline: none;
+}
+
+#switchboard .top-bar h1 {
+    font-size: 24px;
+    font-weight: 600;
     margin: 0;
+}
+
+#switchboard input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  border: none;
+  width: 52px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  cursor: pointer;
+  background-color: var(--primary-color-faded);
+  /* the thumb is a gradient, not a pseudo-element */
+  background-image: radial-gradient(circle at 14px 14px,
+                    white 0 10.5px, transparent 11px);
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  transition: background-color .25s cubic-bezier(0.34, 1.2, 0.64, 1), background-position .25s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+#switchboard input[type="checkbox"]:checked {
+  background-color: var(--primary-color);
+  background-position: 24px 0;
+}
+
+#switchboard input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
 }
 
 #switchboard .setting-row {
@@ -23,6 +62,7 @@
   gap: 16px;
   padding: 10px 0;
   cursor: pointer;
+  user-select: none;
 }
 
 #switchboard .setting-row + .setting-row {
@@ -32,10 +72,9 @@
 #switchboard {
     box-sizing: border-box;
     width: 500px;
-    height: 300px;
     padding: 20px;
     margin: auto;
-    border-radius: 20px;
+    border-radius: 37.5px;
     border: none;
     outline: none;
     -webkit-font-smoothing: antialiased;

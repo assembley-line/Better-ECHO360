@@ -1,7 +1,9 @@
 import { SyllabusService } from "@/services/syllabus";
+import settings from "@/tools/settings";
 import waitForElement from "@/tools/waitForElement";
 
 export default function LessonList(courseId: string) {
+    if (settings.syllabus.hidden) return;
     const syllabus = new SyllabusService(courseId);
 
     syllabus.init().then((success) => {

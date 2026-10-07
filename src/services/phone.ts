@@ -2,7 +2,6 @@ import { SoftService } from "@/services";
 import Toolbar from "@/services/toolbar";
 import waitForElement from "@/tools/waitForElement";
 import { createEmbed } from "@/tools/youtube";
-import settings from "@/tools/settings";
 
 class PhoneService extends SoftService {
     private static videoUrl = "https://www.youtube.com/watch?v=_bwtEtYQwgc";
@@ -10,8 +9,6 @@ class PhoneService extends SoftService {
     private phoneEl: HTMLElement | null = null; // renamed from `window` to avoid confusion with the global
 
     constructor() {
-        if (settings.phone.hidden) return;
-
         super("Phone");
         this.disable();
         this.UI_attachButton();

@@ -27,6 +27,7 @@ class ArtistService extends HardService {
 
         injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
         injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
+        injectStylesheet(`${PHOSPHOR_BASE}/bold/style.css`);
     }
 }
 

@@ -1,5 +1,4 @@
 import { HardService } from "@/services";
-import settings from "@/tools/settings";
 import {
     literal,
     object,
@@ -47,8 +46,6 @@ export class SyllabusService extends HardService {
     private items: SyllabusList = [];
 
     constructor(private courseId: string) {
-        if (settings.syllabus.hidden) { return }
-
         super("Syllabus");
     }
 

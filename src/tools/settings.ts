@@ -22,6 +22,10 @@ const defaults = {
         hidden: false,
         enabled: true,
     },
+
+    reporter: {
+        verbosity: 1,
+    }
 };
 
 type SettingsShape = typeof defaults;

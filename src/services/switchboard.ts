@@ -27,11 +27,10 @@ class SwitchboardService extends HardService {
 
         this.dialog.innerHTML = template;
 
-        this.dialog.querySelector("#phone-enabled")
         bindCheckbox(this.dialog, "#phone-enabled", "phone.hidden")
-
-        this.dialog.querySelector("#timemachine-enabled")
         bindCheckbox(this.dialog, "#timemachine-enabled", "timemachine.hidden")
+        bindCheckbox(this.dialog, "#captions-enabled", "captions.hidden")
+        bindCheckbox(this.dialog, "#syllabus-enabled", "syllabus.hidden")
 
         document.body.appendChild(this.dialog);
     }
