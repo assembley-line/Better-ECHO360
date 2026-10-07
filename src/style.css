@@ -1,3 +1,5 @@
+@import "@/styles/switchboard.css";
+
 :root {
     --primary-color: #d5006c;
     --primary-color-darker:#b3005c;

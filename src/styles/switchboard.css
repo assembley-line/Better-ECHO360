@@ -1,0 +1,95 @@
+#switchboard input {
+    background-color: red;
+}
+
+#switchboard.top-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+}
+
+#switchboard.top-bar h1 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+}
+
+#switchboard .setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+
+#switchboard .setting-row + .setting-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+#switchboard {
+    box-sizing: border-box;
+    width: 500px;
+    height: 300px;
+    padding: 20px;
+    margin: auto;
+    border-radius: 20px;
+    border: none;
+    outline: none;
+    -webkit-font-smoothing: antialiased;
+
+    /* layered shadow: contact edge, mid, long soft drop, plus an inset top highlight */
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.2),
+        0 8px 24px rgba(0, 0, 0, 0.3),
+        0 24px 80px rgba(0, 0, 0, 0.45);
+
+    opacity: 0;
+    scale: 0.97;
+    transition:
+        opacity 0.2s ease-out,
+        scale 0.2s ease-out,
+        overlay 0.2s allow-discrete,
+        display 0.2s allow-discrete;
+}
+
+#switchboard[open] {
+    opacity: 1;
+    scale: 1;
+}
+
+@starting-style {
+    #switchboard[open] {
+        opacity: 0;
+        scale: 0.97;
+    }
+}
+
+#switchboard p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#switchboard::backdrop {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(70%);
+    -webkit-backdrop-filter: blur(1px) saturate(70%);
+    opacity: 0;
+    transition:
+        opacity 0.2s ease-out,
+        overlay 0.2s allow-discrete,
+        display 0.2s allow-discrete;
+}
+
+#switchboard[open]::backdrop {
+    opacity: 1;
+}
+
+@starting-style {
+    #switchboard[open]::backdrop {
+        opacity: 0;
+    }
+}
