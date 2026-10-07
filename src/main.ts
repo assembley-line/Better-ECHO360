@@ -1,12 +1,11 @@
-import { RouterService } from "./services/router";
-import { Artist } from "./services/artist";
-import { type SettingsShape } from "./tools/settings";
+import { RouterService } from "@/services/router";
+import { Artist } from "@/services/artist";
+import settings from "@/tools/settings";
 
 declare global {
     interface Window {
         playerStore: any;
         transcriptStore: any;
-        settings: SettingsShape;
         __cr: any;
         __candidates: any;
         setPlaybackSpeed: any;
@@ -16,6 +15,7 @@ declare global {
 
 (async function () {
     "use strict";
+    if (settings.better_echo360.disabled) { return }
 
     const artist = new Artist();
     artist.paint();
