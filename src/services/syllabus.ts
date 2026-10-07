@@ -79,11 +79,10 @@ export class SyllabusService extends HardService {
                     parsed.push(result.output);
                 } else {
                     skipped++;
-                    console.debug("Skipped syllabus item:", result.issues, raw);
                 }
             }
 
-            this.reporter.tell("Successfully read and parsed the syllabus");
+            this.reporter.tell("Successfully read and parsed the syllabus, skipped " + skipped + " items");
             this.items = parsed;
             return true;
         } catch (e) {

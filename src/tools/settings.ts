@@ -5,6 +5,10 @@ const defaults = {
         disabled: false,
     },
 
+    phone: {
+        hidden: false,
+    },
+
     timemachine: {
         hidden: false,
         defaultSpeed: 1,
@@ -12,7 +16,6 @@ const defaults = {
 
     syllabus: {
         hidden: false,
-        enabled: true,
     },
 
     captions: {

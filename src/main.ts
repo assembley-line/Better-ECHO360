@@ -1,6 +1,7 @@
 import { RouterService } from "@/services/router";
 import { Artist } from "@/services/artist";
 import settings from "@/tools/settings";
+import { Switchboard } from "./services/switchboard";
 
 declare global {
     interface Window {
@@ -16,6 +17,7 @@ declare global {
 (async function () {
     "use strict";
     if (settings.better_echo360.disabled) { return }
+    new Switchboard();
 
     const artist = new Artist();
     artist.paint();
