@@ -1,6 +1,7 @@
 import lesson from "@/routes/lesson";
 import LessonList from "@/routes/lesson_list";
 import { HardService } from "@/services";
+import { Artist } from "@/services/artist";
 
 type MatchResult<T> = { matches: true; data: T } | { matches: false };
 
@@ -51,6 +52,7 @@ export class RouterService extends HardService {
             const result = route.matcher(location);
             if (result.matches) {
                 this.reporter.tell(`Matched route for (${route.name})`);
+                new Artist().paint(); // Apply styles on when a route is matched
                 route.handler(result.data);
                 return;
             }

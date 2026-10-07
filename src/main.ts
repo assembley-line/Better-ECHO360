@@ -1,7 +1,7 @@
 import { RouterService } from "@/services/router";
-import { Artist } from "@/services/artist";
+import { Switchboard } from "@/services/switchboard";
+
 import settings from "@/tools/settings";
-import { Switchboard } from "./services/switchboard";
 
 declare global {
     interface Window {
@@ -16,36 +16,35 @@ declare global {
 
 (async function () {
     "use strict";
-    if (settings.better_echo360.disabled) { return }
+    // This must load first, controls all aspects of the extension
+    // can be used to disable the extension entirely, or to disable specific features
     new Switchboard();
-
-    const artist = new Artist();
-    artist.paint();
+    if (settings.better_echo360.disabled) return;
 
     const router = new RouterService();
     router.route();
 
-//     const playerStore = Hacker.grab(ZustandStore.PlayerStore)
-//     window.playerStore = playerStore;
-//     const transcriptStore = Hacker.grab(ZustandStore.TranscriptStore)
-//     window.transcriptStore = transcriptStore;
-//
-//     function betterCandidates() {
-//         return window.__candidates.map(function (s: any, i: any) {
-//             try {
-//                 var state = s.getState();
-//                 return { i: i, state: state };
-//             } catch (e) {
-//                 return {
-//                     i: i,
-//                     error:
-//                         (e as { message: string }).message || "Unknown error",
-//                 };
-//             }
-//         });
-//     }
-//
-//     window.betterCandidates = betterCandidates;
+    //     const playerStore = Hacker.grab(ZustandStore.PlayerStore)
+    //     window.playerStore = playerStore;
+    //     const transcriptStore = Hacker.grab(ZustandStore.TranscriptStore)
+    //     window.transcriptStore = transcriptStore;
+    //
+    //     function betterCandidates() {
+    //         return window.__candidates.map(function (s: any, i: any) {
+    //             try {
+    //                 var state = s.getState();
+    //                 return { i: i, state: state };
+    //             } catch (e) {
+    //                 return {
+    //                     i: i,
+    //                     error:
+    //                         (e as { message: string }).message || "Unknown error",
+    //                 };
+    //             }
+    //         });
+    //     }
+    //
+    //     window.betterCandidates = betterCandidates;
 })();
 
 export {};
