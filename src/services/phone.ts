@@ -1,8 +1,11 @@
 import { SoftService } from "@/services";
 import Toolbar from "@/services/toolbar";
+import { hidden } from "@/tools/hiddenDecorator";
+import settings from "@/tools/settings";
 import waitForElement from "@/tools/waitForElement";
 import { createEmbed } from "@/tools/youtube";
 
+@hidden(settings.phone.hidden)
 class PhoneService extends SoftService {
     private static videoUrl = "https://www.youtube.com/watch?v=_bwtEtYQwgc";
     private button: HTMLElement | null = null;

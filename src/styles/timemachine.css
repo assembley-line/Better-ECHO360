@@ -1,0 +1,134 @@
+.speed-popover {
+    /* Local variables (only available on .speed-popover and its children) */
+    --ease: cubic-bezier(0.34, 1.05, 0.64, 1);
+
+    --open-duration: 0.15s;
+    --open-fade-duration: 0.2s;
+    --close-duration: 0.15s;
+    --close-fade-duration: 0.2s;
+
+    --closed-scale: 0.9;
+    --closed-offset: 12px;
+
+    margin: 0;
+    padding: 10px;
+    padding-top: 15px;
+    border: 0;
+    outline: 0;
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(200px) saturate(40%);
+    width: 350px;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+        sans-serif;
+
+    /* Anchor positioning */
+    position: fixed;
+    inset: unset;
+    position-anchor: --anchor;
+    justify-self: anchor-center;
+    bottom: calc(anchor(top) + 20px);
+
+    /* Closed state */
+    opacity: 0;
+    scale: var(--closed-scale);
+    translate: 0 var(--closed-offset);
+    transform-origin: bottom center;
+
+    /* Closing transition */
+    transition:
+        opacity var(--close-fade-duration) var(--ease),
+        scale var(--close-duration) var(--ease),
+        translate var(--close-duration) var(--ease),
+        overlay var(--close-duration) allow-discrete,
+        display var(--close-duration) allow-discrete;
+}
+
+.speed-popover:popover-open {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+
+    /* Opening transition */
+    transition:
+        opacity var(--open-fade-duration) var(--ease),
+        scale var(--open-duration) var(--ease),
+        translate var(--open-duration) var(--ease),
+        overlay var(--open-duration) allow-discrete,
+        display var(--open-duration) allow-discrete;
+}
+
+@starting-style {
+    .speed-popover:popover-open {
+        opacity: 0;
+        scale: var(--closed-scale);
+        translate: 0 var(--closed-offset);
+    }
+}
+
+.speed-popover .button-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    justify-content: center;
+    align-items: center;
+}
+
+.speed-popover .button-row + .button-row {
+    margin-top: 10px;
+}
+
+#timemachine-button {
+    anchor-name: --anchor;
+}
+
+.speed-popover button[data-speed] {
+    border: none;
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+    height: 36px;
+    border-radius: 18px;
+}
+
+.speed-popover .plus {
+    height: 36px;
+    aspect-ratio: 1;
+    border-radius: 18px;
+
+    border: none;
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+
+    font-size: 18px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.speed-popover p {
+    flex: 1;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.speed-popover .total-time-p {
+    font-size: 12px;
+    font-weight: 400;
+    margin-top: 10px;
+    text-transform: capitalise;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.4);
+}

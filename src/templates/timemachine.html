@@ -1,0 +1,27 @@
+<dialog class="speed-popover" id="be360-speed-popover" popover>
+    <div class="button-row">
+        <button
+            type="button"
+            class="plus"
+            id="decrease-speed"
+            data-delta="-0.1"
+        >
+            <i class="ph-bold ph-minus"></i>
+        </button>
+        <p id="current-speed">{}x</p>
+        <button type="button" class="plus" id="increase-speed" data-delta="0.1">
+            <i class="ph-bold ph-plus"></i>
+        </button>
+    </div>
+    <div class="button-row">
+        <button type="button" data-speed="1">1×</button>
+        <button type="button" data-speed="1.5">1.5×</button>
+        <button type="button" data-speed="2">2×</button>
+        <button type="button" data-speed="2.5">2.5×</button>
+        <button type="button" data-speed="3">3×</button>
+        <button type="button" data-speed="3.5">3.5×</button>
+    </div>
+    <p class="total-time-p" id="sum-lecture-time">
+        Total lecture time is {} mins
+    </p>
+</dialog>

@@ -2,6 +2,8 @@ import { StoreService } from "@/services";
 import Hacker from "./hacker";
 import Toolbar from "./toolbar";
 import { ZustandStore } from "./hacker";
+import { hidden } from "@/tools/hiddenDecorator";
+import settings from "@/tools/settings";
 
 interface Cue {
     startMs: number;
@@ -17,6 +19,7 @@ interface RetrievedCue {
     end: number;
 }
 
+@hidden(settings.captions.hidden)
 export class CaptionsService extends StoreService {
     private static readonly wrapperId = "better-echo360-caption-wrapper";
     private static readonly boxId = "better-echo360-captions";
@@ -28,10 +31,15 @@ export class CaptionsService extends StoreService {
     private captionsIconButton: HTMLElement | null = null;
 
     constructor() {
-        super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
+        super("Captions", [
+            ZustandStore.PlayerStore,
+            ZustandStore.TranscriptStore,
+        ]);
 
-        if (this.closed) { return }
-        this.init()
+        if (this.closed) {
+            return;
+        }
+        this.init();
     }
 
     // Check if the captions service can function, if not, report unavailable
@@ -51,8 +59,8 @@ export class CaptionsService extends StoreService {
     }
 
     protected onCloseService(): void {
-        this.destroy()
-        this.UI_RemoveButtonFromToolbar()
+        this.destroy();
+        this.UI_RemoveButtonFromToolbar();
     }
 
     // Fetching cues logic
@@ -66,12 +74,15 @@ export class CaptionsService extends StoreService {
             this.reporter.warn(
                 "Max fetch attempts reached for cues, stopping further attempts.",
             );
-            this.close()
+            this.close();
             return null;
         }
 
         this.fetchCount += 1;
-        return (Hacker.grab(ZustandStore.TranscriptStore).getState().transcripts as Cue[]) || null;
+        return (
+            (Hacker.grab(ZustandStore.TranscriptStore).getState()
+                .transcripts as Cue[]) || null
+        );
     }
 
     private getCueFromTimestamp(timestamp: number): RetrievedCue | null {
@@ -106,26 +117,28 @@ export class CaptionsService extends StoreService {
         this.reporter.tell("Attaching captions box");
         this.captionsBox = this.setupCaptionBox();
 
-        this.unsub = Hacker.grab(ZustandStore.PlayerStore).subscribe((state: any) => {
-            const timestamp = state.currentTime;
+        this.unsub = Hacker.grab(ZustandStore.PlayerStore).subscribe(
+            (state: any) => {
+                const timestamp = state.currentTime;
 
-            if (timestamp < this.currentCueEnd) {
-                return;
-            }
+                if (timestamp < this.currentCueEnd) {
+                    return;
+                }
 
-            const cue = this.getCueFromTimestamp(timestamp);
-            var content = "";
+                const cue = this.getCueFromTimestamp(timestamp);
+                var content = "";
 
-            if (cue) {
-                content = cue.content;
-                this.currentCueEnd = cue.end;
-            } else {
-                content = "";
-                this.currentCueEnd = -1;
-            }
+                if (cue) {
+                    content = cue.content;
+                    this.currentCueEnd = cue.end;
+                } else {
+                    content = "";
+                    this.currentCueEnd = -1;
+                }
 
-            this.captionsBox!.textContent = content;
-        });
+                this.captionsBox!.textContent = content;
+            },
+        );
     }
 
     private setupCaptionBox(): HTMLElement {
@@ -173,22 +186,27 @@ export class CaptionsService extends StoreService {
 
     private async UI_AttachButtonToToolbar(): Promise<void> {
         const toolbar = new Toolbar();
-        const button = await toolbar.addIconButton(["ph", "ph-closed-captioning"]);
-        if (!button) { return }
+        const button = await toolbar.addIconButton([
+            "ph",
+            "ph-closed-captioning",
+        ]);
+        if (!button) {
+            return;
+        }
 
-        button.toggleAttribute('data-enabled', this.enabled)
+        button.toggleAttribute("data-enabled", this.enabled);
         button.addEventListener("click", () => {
-            this.toggle()
-            button.toggleAttribute("data-enabled", this.enabled)
-        })
+            this.toggle();
+            button.toggleAttribute("data-enabled", this.enabled);
+        });
 
-        this.captionsIconButton = button
+        this.captionsIconButton = button;
     }
 
     private async UI_RemoveButtonFromToolbar(): Promise<void> {
         if (this.captionsIconButton) {
-            this.captionsIconButton.remove()
-            this.captionsIconButton = null
+            this.captionsIconButton.remove();
+            this.captionsIconButton = null;
         }
     }
 

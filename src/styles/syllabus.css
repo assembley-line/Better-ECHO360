@@ -1,0 +1,122 @@
+.be360-highlight-ring {
+    isolation: isolate;
+    position: fixed;
+    border: 7px solid var(--primary-color);
+    border-radius: 7px;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 2147483647;
+    opacity: 0; /* starts invisible, animation takes over from here */
+    animation: be360-ring-pulse 1.5s ease-in-out forwards;
+}
+
+@keyframes be360-ring-pulse {
+    0% {
+        opacity: 0;
+    }
+    15% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+.syllabus-options-box {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    bottom: 0px;
+    right: 10px;
+    background-color: #f7f7f7;
+    border: 1px solid #eee1e3;
+    border-radius: 30px;
+    border-end-end-radius: 0px;
+    border-bottom-left-radius: 0px;
+    padding: 10px;
+    padding-bottom: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+
+    font-size: 14px;
+    color: lightslategray;
+
+    align-items: center;
+    gap: 10px;
+
+    animation: platform-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes platform-pop-in {
+    0% {
+        transform: translateY(40px) scale(0.9);
+    }
+    100% {
+        transform: translateY(0) scale(1);
+    }
+}
+
+.syllabus-button-group {
+    display: flex;
+    flex-direction: row;
+    gap: 2px;
+    width: 440px;
+}
+
+.watch-button {
+    position: relative;
+    padding: 10px 0;
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    flex: 1;
+    height: 40px;
+    border-radius: 20px;
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.jump-button {
+    position: relative;
+    padding: 10px 0;
+    flex: 1;
+    height: 40px;
+    background-color: var(--primary-color-faded);
+    color: var(--primary-color);
+    border: none;
+    border-radius: 20px;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    font-weight: semibold;
+}
+
+.options-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    aspect-ratio: 1;
+    border-radius: 20px;
+    background-color: gainsboro;
+    border: none;
+    margin-left: 6px;
+    transition: all 0.8s cubic-bezier(0.34, 1, 0.64, 1);
+}
+
+.jump-button:hover,
+.watch-button:hover {
+    flex: 1.25;
+}
+
+.options-button:hover {
+    rotate: 180deg;
+}

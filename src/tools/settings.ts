@@ -12,6 +12,8 @@ const defaults = {
     timemachine: {
         hidden: false,
         defaultSpeed: 1,
+        betterTimemachine: false,
+        hideNativeSpeedSelector: false,
     },
 
     syllabus: {
@@ -25,11 +27,11 @@ const defaults = {
 
     reporter: {
         verbosity: 1,
-    }
+    },
 };
 
 type SettingsShape = typeof defaults;
-export { type SettingsShape }
+export { type SettingsShape };
 
 function section<K extends keyof SettingsShape>(name: K): SettingsShape[K] {
     const read = (): SettingsShape[K] => ({
@@ -64,6 +66,6 @@ const settings = Object.fromEntries(
     ]),
 ) as SettingsShape;
 
-window.settings = settings
+window.settings = settings;
 
 export default settings;

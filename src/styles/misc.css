@@ -1,0 +1,37 @@
+.icon-button-captions {
+    height: 2rem;
+    aspect-ratio: 1;
+    background: transparent;
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    font-size: 22px;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.icon-button-captions:hover {
+    background: white;
+    color: black;
+}
+
+.icon-button-captions:active {
+    background: rgba(255, 255, 255, 0.5);
+    color: black;
+}
+
+.icon-button-captions:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.icon-button-captions[data-enabled] {
+    background: var(--primary-color);
+    color: white;
+}
+
+.icon-button-captions[data-enabled]:hover {
+    background: var(--primary-color-darker);
+}

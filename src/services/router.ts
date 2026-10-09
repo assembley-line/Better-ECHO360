@@ -2,6 +2,7 @@ import lesson from "@/routes/lesson";
 import LessonList from "@/routes/lesson_list";
 import { HardService } from "@/services";
 import { Artist } from "@/services/artist";
+import { reporter, type Reporter } from "@/tools/reporterDecorator";
 
 type MatchResult<T> = { matches: true; data: T } | { matches: false };
 
@@ -11,6 +12,9 @@ interface Route<T = void> {
     handler: (data: T) => void;
 }
 
+export interface RouterService extends Reporter {}
+
+@reporter
 export class RouterService extends HardService {
     private static routes: Route<any>[] = [
         {
@@ -51,13 +55,14 @@ export class RouterService extends HardService {
         for (const route of RouterService.routes) {
             const result = route.matcher(location);
             if (result.matches) {
-                this.reporter.tell(`Matched route for (${route.name})`);
+                // this.reporter.report(`Matched route for (${route.name})`);
+                this.report(`Matched route for (${route.name})`);
                 new Artist().paint(); // Apply styles on when a route is matched
                 route.handler(result.data);
                 return;
             }
         }
 
-        this.reporter.warn(`No route matched for ${location.pathname}`);
+        this.reporter.report(`No route matched for ${location.pathname}`);
     }
 }

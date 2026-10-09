@@ -1,4 +1,5 @@
 import { HardService } from "@/services";
+import template from "@/templates/syllabusPlatform.html?raw";
 import {
     literal,
     object,
@@ -10,6 +11,10 @@ import {
     optional,
     type InferOutput,
 } from "valibot";
+import waitForElement from "@/tools/waitForElement";
+import fromTemplate from "@/tools/fromTemplate";
+import { hidden } from "@/tools/hiddenDecorator";
+import settings from "@/tools/settings";
 
 const SyllabusDateTimeSchema = pipe(
     string(),
@@ -42,15 +47,19 @@ const SyllabusListSchema = array(SyllabusItemSchema);
 
 type SyllabusList = InferOutput<typeof SyllabusListSchema>;
 
+@hidden(settings.syllabus.hidden)
 export class SyllabusService extends HardService {
     private items: SyllabusList = [];
 
     constructor(private courseId: string) {
         super("Syllabus");
+
+        this.init();
     }
 
     public async init(): Promise<boolean> {
         try {
+            this.reporter.report("Fetching the syllabus");
             const response = await fetch(
                 `https://echo360.net.au/section/${this.courseId}/syllabus`,
                 {
@@ -79,8 +88,13 @@ export class SyllabusService extends HardService {
                 }
             }
 
-            this.reporter.tell("Successfully read and parsed the syllabus, skipped " + skipped + " items");
+            this.reporter.tell(
+                "Successfully read and parsed the syllabus, skipped " +
+                    skipped +
+                    " items",
+            );
             this.items = parsed;
+            this.UI.attachOptionsPlatform();
             return true;
         } catch (e) {
             this.reporter.scream("Syllabus fetch threw an error: " + e);
@@ -102,8 +116,83 @@ export class SyllabusService extends HardService {
         );
     }
 
+    public async getTodaysLessonElement(): Promise<HTMLElement | null> {
+        const todays = this.getTodaysLessons();
+        if (todays.length == 0) {
+            console.info("No lessons today");
+            return null; // No lessons today, do nothing
+        }
+        const first = todays[0];
+        // Check if the page contains that id box
+        const lessonElement = await waitForElement(
+            `[data-test-lessonid="${first.id}"]`,
+        );
+        if (!lessonElement) {
+            console.error(
+                "Something went wrong, no element found for lesson ",
+                first.id,
+            );
+            return null;
+        }
+
+        return lessonElement;
+    }
+
     public getTodaysLessons(): SyllabusList {
         const today = new Date();
         return this.findLessonsByDate(today);
+    }
+
+    private UI = {
+        attachOptionsPlatform: async () => {
+            const platform = fromTemplate<HTMLDivElement>(template);
+
+            const first = this.getTodaysLessons()[0];
+            const lessonElement = await this.getTodaysLessonElement();
+            if (!lessonElement) {
+                console.error("No lesson element found for today's lesson");
+                return;
+            }
+
+            platform
+                .querySelector(".jump-button")
+                ?.addEventListener("click", () => {
+                    lessonElement.scrollIntoView({ behavior: "smooth" });
+                    const ring = this.createHighlightRing(lessonElement);
+                    setTimeout(() => {
+                        ring.remove();
+                    }, 1500); // 1500 linked to css animation duration
+                });
+            platform
+                .querySelector(".watch-button")
+                ?.addEventListener("click", () => {
+                    window.location.assign(
+                        `https://echo360.net.au/lesson/${first.id}/classroom`,
+                    );
+                });
+
+            document.body.append(platform);
+        },
+    };
+
+    private createHighlightRing(target: Element): HTMLElement {
+        const ring = document.createElement("div");
+        ring.className = "be360-highlight-ring";
+        document.body.appendChild(ring);
+        const ringPadding = 3;
+
+        function position() {
+            const rect = target.getBoundingClientRect();
+            ring.style.top = `${rect.top - ringPadding}px`;
+            ring.style.left = `${rect.left - ringPadding}px`;
+            ring.style.width = `${rect.width + 2 * ringPadding}px`;
+            ring.style.height = `${rect.height + 2 * ringPadding}px`;
+        }
+
+        position();
+        window.addEventListener("scroll", position, true);
+        window.addEventListener("resize", position);
+
+        return ring;
     }
 }
