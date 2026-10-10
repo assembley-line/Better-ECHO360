@@ -1,13 +1,17 @@
 import { StoreService } from "@/services";
 import Hacker, { ZustandStore } from "@/services/hacker";
 import settings from "@/tools/settings";
-import Toolbar from "@/services/toolbar";
+import {Toolbar} from "@/services/toolbar";
 import fromTemplate from "@/tools/fromTemplate";
 import template from "@/templates/timemachine.html?raw";
 import waitForElement from "@/tools/waitForElement";
 import { hidden } from "@/tools/hiddenDecorator";
+import { reporter, type Reporter } from "@/tools/reporterDecorator";
+
+interface TimeMachineService extends Reporter {}
 
 @hidden(settings.timemachine.hidden)
+@reporter
 class TimeMachineService extends StoreService {
     // This class controls and implements a custom speed control for the video player
     // it requires the PlayerStore to be patched into

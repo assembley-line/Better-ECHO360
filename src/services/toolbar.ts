@@ -1,7 +1,11 @@
 import { HardService } from "@/services";
+import { reporter, type Reporter } from "@/tools/reporterDecorator";
 import waitForElement from "@/tools/waitForElement";
 
-export default class Toolbar extends HardService {
+interface Toolbar extends Reporter {}
+
+@reporter
+class Toolbar extends HardService {
     private static locating: Promise<HTMLElement | null> | null = null;
 
     constructor() {
@@ -11,9 +15,13 @@ export default class Toolbar extends HardService {
 
     private locate(): Promise<HTMLElement | null> {
         return (Toolbar.locating ??= (async () => {
-            const fullscreenButton = await waitForElement("#fullscreen-toggle-btn");
+            const fullscreenButton = await waitForElement(
+                "#fullscreen-toggle-btn",
+            );
             if (!fullscreenButton) {
-                this.reporter.warn("Could not find the fullscreen button to locate the toolbar.");
+                this.reporter.warn(
+                    "Could not find the fullscreen button to locate the toolbar.",
+                );
                 return null;
             }
 
@@ -31,7 +39,10 @@ export default class Toolbar extends HardService {
         return this.locate();
     }
 
-    async addIconButton(iconClasses: string[], handler?: () => void): Promise<HTMLElement | void> {
+    async addIconButton(
+        iconClasses: string[],
+        handler?: () => void,
+    ): Promise<HTMLElement | void> {
         const toolbar = await this.getElement();
         if (!toolbar) return;
 
@@ -39,14 +50,16 @@ export default class Toolbar extends HardService {
         const icon = document.createElement("i");
         icon.classList.add(...iconClasses);
         iconButton.appendChild(icon);
-        iconButton.classList.add("icon-button-captions")
+        iconButton.classList.add("icon-button-captions");
 
         if (handler) {
-            iconButton.addEventListener("click", handler)
+            iconButton.addEventListener("click", handler);
         }
 
-        toolbar.prepend(iconButton)
+        toolbar.prepend(iconButton);
 
         return iconButton;
     }
 }
+
+export { Toolbar };

@@ -6,29 +6,29 @@ export abstract class Service {
 
     protected constructor(name: string) {
         this.reporter = new Reporter(name);
-        this.reporter.init()
+        this.reporter.init();
     }
 }
 
-export abstract class HardService extends Service { }
+export abstract class HardService extends Service {}
 export abstract class SoftService extends Service {
     protected enabled: boolean;
 
     protected constructor(name: string) {
         super(name);
-        this.enabled = true
+        this.enabled = true;
     }
 
     protected enable(): void {
-        this.reporter.tell("Service has been enabled")
+        this.reporter.tell("Service has been enabled");
         this.enabled = true;
-        this.onToggleService()
+        this.onToggleService();
     }
 
     protected disable(): void {
-        this.reporter.tell("Service has been disabled")
+        this.reporter.tell("Service has been disabled");
         this.enabled = false;
-        this.onToggleService()
+        this.onToggleService();
     }
 
     protected toggle(): void {
@@ -39,7 +39,7 @@ export abstract class SoftService extends Service {
         }
     }
 
-    protected onToggleService(): void { }
+    protected onToggleService(): void {}
 }
 
 export abstract class StoreService extends SoftService {
@@ -52,18 +52,20 @@ export abstract class StoreService extends SoftService {
 
         for (const dependency of dependencies) {
             if (!Hacker.grab(dependency)) {
-                this.reporter.warn("Failed to resolve all dependencies, closing service")
-                this.close()
-                return
+                this.reporter.warn(
+                    "Failed to resolve all dependencies, closing service",
+                );
+                this.close();
+                return;
             }
         }
     }
 
     protected close(): void {
-        this.reporter.scream("Service has been closed")
+        this.reporter.scream("Service has been closed");
         this.closed = true;
-        this.onCloseService()
+        this.onCloseService();
     }
 
-    protected onCloseService(): void { }
+    protected onCloseService(): void {}
 }

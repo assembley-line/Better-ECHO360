@@ -1,6 +1,6 @@
 import { StoreService } from "@/services";
 import Hacker from "./hacker";
-import Toolbar from "./toolbar";
+import { Toolbar } from "./toolbar";
 import { ZustandStore } from "./hacker";
 import { hidden } from "@/tools/hiddenDecorator";
 import settings from "@/tools/settings";

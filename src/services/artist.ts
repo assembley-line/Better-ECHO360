@@ -10,10 +10,11 @@ class ArtistService extends HardService {
         const style = document.createElement("style");
         style.id = "be360-styles";
         style.textContent = rawStyles;
-        this.reporter.report("Injected the stylesheet from style.css")
+        this.reporter.report("Injected the stylesheet from style.css");
         document.head.appendChild(style);
 
-        const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
+        const PHOSPHOR_BASE =
+            "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
 
         const injectStylesheet = (href: string) => {
             const link = document.createElement("link");
@@ -21,9 +22,11 @@ class ArtistService extends HardService {
             link.type = "text/css";
             link.href = href;
             document.head.appendChild(link);
-            this.reporter.report(`Injected the stylesheet with the href: ${href}`)
+            this.reporter.report(
+                `Injected the stylesheet with the href: ${href}`,
+            );
             return link;
-        }
+        };
 
         injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
         injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
@@ -31,4 +34,4 @@ class ArtistService extends HardService {
     }
 }
 
-export { ArtistService as Artist }
+export { ArtistService as Artist };

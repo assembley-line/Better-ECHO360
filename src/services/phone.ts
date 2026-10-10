@@ -1,5 +1,5 @@
 import { SoftService } from "@/services";
-import Toolbar from "@/services/toolbar";
+import { Toolbar } from "@/services/toolbar";
 import { hidden } from "@/tools/hiddenDecorator";
 import settings from "@/tools/settings";
 import waitForElement from "@/tools/waitForElement";

@@ -11,1129 +11,1339 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
-(function() {
-	"use strict";
-	var Reporter = class Reporter {
-		static REPORT_ATTACHES = false;
-		name;
-		constructor(name) {
-			this.name = name;
-		}
-		static prefix = "Better ECHO360";
-		init() {
-			if (Reporter.REPORT_ATTACHES) this.report("Reporter attached");
-		}
-		stamp(input) {
-			return `[${Reporter.prefix}] [${this.name}] ${input}`;
-		}
-		tell(message) {
-			console.info(this.stamp(message));
-		}
-		report(message) {
-			console.log(this.stamp(message));
-		}
-		warn(message) {
-			console.warn(this.stamp(message));
-		}
-		scream(message) {
-			console.error(this.stamp(message));
-		}
-	};
-	function enumName(enumObj, value) {
-		return Object.keys(enumObj).find((k) => !/^\d+$/.test(k) && enumObj[k] === value);
-	}
-	var w = (() => typeof unsafeWindow != "undefined" ? unsafeWindow : void 0)();
-	var ZustandStore = function(ZustandStore) {
-		ZustandStore["PlayerStore"] = "playbackRate";
-		ZustandStore["TranscriptStore"] = "transcripts";
-		return ZustandStore;
-	}({});
-	var HackerService = class HackerService {
-		static stores = {};
-		static _reporter = null;
-		static get reporter() {
-			if (!HackerService._reporter) {
-				HackerService._reporter = new Reporter("Hacker");
-				HackerService._reporter.init();
-			}
-			return HackerService._reporter;
-		}
-		constructor() {}
-		static grab(store) {
-			const cached = HackerService.stores[store];
-			if (cached) return cached;
-			const found = HackerService.findStore(store);
-			if (found) HackerService.stores[store] = found;
-			return found;
-		}
-		static findStore(store) {
-			var prefix = `(${enumName(ZustandStore, store)}) `;
-			HackerService.reporter.report(prefix + "Finding");
-			var req = w.__cr;
-			if (!req) {
-				var chunkNames = [];
-				Object.keys(w).forEach(function(k) {
-					if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k)) chunkNames.push(k);
-				});
-				for (var n = 0; n < chunkNames.length; n++) {
-					var arr = w[chunkNames[n]];
-					if (!Array.isArray(arr)) continue;
-					try {
-						arr.push([
-							[],
-							{ __grabber__: function(module, exports, __webpack_require__) {
-								w.__cr = __webpack_require__;
-							} },
-							[["__grabber__"]]
-						]);
-					} catch (e) {}
-					if (w.__cr) {
-						req = w.__cr;
-						break;
-					}
-				}
-			}
-			if (!req) {
-				this.reporter.warn("Could not capture webpack require — no webpackJsonp/webpackChunk array found");
-				return null;
-			}
-			var cache = req.c;
-			var candidates = [];
-			for (var id in cache) {
-				var exp;
-				try {
-					exp = cache[id] && cache[id].exports;
-				} catch (e) {
-					continue;
-				}
-				if (!exp) continue;
-				var values;
-				try {
-					values = [exp, exp.default].concat(Object.values(exp));
-				} catch (e) {
-					continue;
-				}
-				for (var i = 0; i < values.length; i++) {
-					var val = values[i];
-					try {
-						if (val && typeof val.getState === "function" || typeof val.setState === "function") candidates.push(val);
-					} catch (e) {}
-				}
-			}
-			this.reporter.report(prefix + "Found: " + candidates.length + " candidates");
-			var match = candidates.find(function(s) {
-				try {
-					return store.valueOf() in s.getState();
-				} catch (e) {
-					return false;
-				}
-			});
-			w.__candidates = candidates;
-			if (!match) this.reporter.warn(prefix + "No matches found, look to window.__candidates for more");
-			else this.reporter.report(prefix + "Found store");
-			return match || null;
-		}
-	};
-	var Service = class {
-		reporter;
-		constructor(name) {
-			this.reporter = new Reporter(name);
-			this.reporter.init();
-		}
-	};
-	var HardService = class extends Service {};
-	var SoftService = class extends Service {
-		enabled;
-		constructor(name) {
-			super(name);
-			this.enabled = true;
-		}
-		enable() {
-			this.reporter.tell("Service has been enabled");
-			this.enabled = true;
-			this.onToggleService();
-		}
-		disable() {
-			this.reporter.tell("Service has been disabled");
-			this.enabled = false;
-			this.onToggleService();
-		}
-		toggle() {
-			if (this.enabled) this.disable();
-			else this.enable();
-		}
-		onToggleService() {}
-	};
-	var StoreService = class extends SoftService {
-		closed = false;
-		dependencies;
-		constructor(name, dependencies) {
-			super(name);
-			this.dependencies = dependencies;
-			for (const dependency of dependencies) if (!HackerService.grab(dependency)) {
-				this.reporter.warn("Failed to resolve all dependencies, closing service");
-				this.close();
-				return;
-			}
-		}
-		close() {
-			this.reporter.scream("Service has been closed");
-			this.closed = true;
-			this.onCloseService();
-		}
-		onCloseService() {}
-	};
-	function waitForElement(selector, timeoutMs = 1e4) {
-		return new Promise((resolve) => {
-			function start() {
-				const existing = document.querySelector(selector);
-				if (existing && existing instanceof HTMLElement) {
-					resolve(existing);
-					return;
-				}
-				let settled = false;
-				const observer = new MutationObserver(() => {
-					const el = document.querySelector(selector);
-					if (el && !settled && el instanceof HTMLElement) {
-						settled = true;
-						observer.disconnect();
-						clearTimeout(timeout);
-						resolve(el);
-					}
-				});
-				observer.observe(document.body, {
-					childList: true,
-					subtree: true
-				});
-				const timeout = setTimeout(() => {
-					if (settled) return;
-					settled = true;
-					observer.disconnect();
-					resolve(null);
-				}, timeoutMs);
-			}
-			if (document.body) start();
-			else document.addEventListener("DOMContentLoaded", start, { once: true });
-		});
-	}
-	var Toolbar = class Toolbar extends HardService {
-		static locating = null;
-		constructor() {
-			super("Toolbar");
-			this.locate();
-		}
-		locate() {
-			return Toolbar.locating ??= (async () => {
-				const fullscreenButton = await waitForElement("#fullscreen-toggle-btn");
-				if (!fullscreenButton) {
-					this.reporter.warn("Could not find the fullscreen button to locate the toolbar.");
-					return null;
-				}
-				const toolbar = fullscreenButton.parentElement;
-				if (!toolbar) {
-					this.reporter.warn("Could not find the toolbar element.");
-					return null;
-				}
-				return toolbar;
-			})();
-		}
-		getElement() {
-			return this.locate();
-		}
-		async addIconButton(iconClasses, handler) {
-			const toolbar = await this.getElement();
-			if (!toolbar) return;
-			const iconButton = document.createElement("button");
-			const icon = document.createElement("i");
-			icon.classList.add(...iconClasses);
-			iconButton.appendChild(icon);
-			iconButton.classList.add("icon-button-captions");
-			if (handler) iconButton.addEventListener("click", handler);
-			toolbar.prepend(iconButton);
-			return iconButton;
-		}
-	};
-	var CaptionsService = class CaptionsService extends StoreService {
-		static wrapperId = "better-echo360-caption-wrapper";
-		static boxId = "better-echo360-captions";
-		currentCueEnd = -1;
-		captionsBox = null;
-		unsub = null;
-		captionsIconButton = null;
-		constructor() {
-			super("Captions", [ZustandStore.PlayerStore, ZustandStore.TranscriptStore]);
-			if (this.closed) return;
-			this.init();
-		}
-		init() {
-			this.cues = this.getAllCues();
-			this.UI_AttachButtonToToolbar();
-			this.attach();
-		}
-		onToggleService() {
-			if (this.enabled) this.attach();
-			else this.destroy();
-		}
-		onCloseService() {
-			this.destroy();
-			this.UI_RemoveButtonFromToolbar();
-		}
-		cues = null;
-		fetchCount = 0;
-		stopFetching = false;
-		maxFetchAttempts = 20;
-		getAllCues() {
-			if (this.fetchCount > this.maxFetchAttempts) {
-				this.reporter.warn("Max fetch attempts reached for cues, stopping further attempts.");
-				this.close();
-				return null;
-			}
-			this.fetchCount += 1;
-			return HackerService.grab(ZustandStore.TranscriptStore).getState().transcripts || null;
-		}
-		getCueFromTimestamp(timestamp) {
-			if (!this.cues) {
-				if (this.stopFetching) return null;
-				this.cues = this.getAllCues();
-				if (!this.cues) return null;
-			}
-			const ms = timestamp * 1e3;
-			for (var i = 0; i < this.cues.length; i++) {
-				const cue = this.cues[i];
-				if (ms >= cue.startMs && ms < cue.endMs) return {
-					content: cue.content,
-					end: Math.floor(cue.endMs / 1e3)
-				};
-			}
-			return null;
-		}
-		attach() {
-			this.reporter.tell("Attaching captions box");
-			this.captionsBox = this.setupCaptionBox();
-			this.unsub = HackerService.grab(ZustandStore.PlayerStore).subscribe((state) => {
-				const timestamp = state.currentTime;
-				if (timestamp < this.currentCueEnd) return;
-				const cue = this.getCueFromTimestamp(timestamp);
-				var content = "";
-				if (cue) {
-					content = cue.content;
-					this.currentCueEnd = cue.end;
-				} else {
-					content = "";
-					this.currentCueEnd = -1;
-				}
-				this.captionsBox.textContent = content;
-			});
-		}
-		setupCaptionBox() {
-			const wrapper = document.createElement("div");
-			wrapper.id = CaptionsService.wrapperId;
-			wrapper.style.cssText = [
-				"position:fixed",
-				"left:0",
-				"right:0",
-				"bottom:60px",
-				"width:100%",
-				"display:flex",
-				"justify-content:center",
-				"pointer-events:none",
-				"z-index:2147483647"
-			].join(";");
-			const box = document.createElement("div");
-			box.id = CaptionsService.boxId;
-			box.style.cssText = [
-				"max-width:80%",
-				"background:rgba(0,0,0,0.75)",
-				"color:#ffffff",
-				"font:20px -apple-system,BlinkMacSystemFont,\"Segoe UI\",Helvetica,Arial,sans-serif",
-				"padding:6px 14px",
-				"border-radius:6px",
-				"text-align:center",
-				"white-space:pre-wrap"
-			].join(";");
-			box.textContent = "";
-			wrapper.appendChild(box);
-			const attach = () => {
-				if (document.body) document.body.appendChild(wrapper);
-				else document.addEventListener("DOMContentLoaded", attach, { once: true });
-			};
-			attach();
-			return box;
-		}
-		async UI_AttachButtonToToolbar() {
-			const button = await new Toolbar().addIconButton(["ph", "ph-closed-captioning"]);
-			if (!button) return;
-			button.toggleAttribute("data-enabled", this.enabled);
-			button.addEventListener("click", () => {
-				this.toggle();
-				button.toggleAttribute("data-enabled", this.enabled);
-			});
-			this.captionsIconButton = button;
-		}
-		async UI_RemoveButtonFromToolbar() {
-			if (this.captionsIconButton) {
-				this.captionsIconButton.remove();
-				this.captionsIconButton = null;
-			}
-		}
-		destroy() {
-			if (this.unsub) {
-				this.unsub();
-				this.unsub = null;
-			}
-			document.getElementById(CaptionsService.wrapperId)?.remove();
-		}
-	};
-	function youtubeId(input) {
-		let u;
-		try {
-			u = new URL(input);
-		} catch {
-			return null;
-		}
-		const host = u.hostname.replace(/^www\.|^m\./, "");
-		let id = null;
-		if (host === "youtu.be") id = u.pathname.slice(1);
-		else if (host === "youtube.com" || host === "youtube-nocookie.com") {
-			if (u.pathname === "/watch") id = u.searchParams.get("v");
-			else {
-				const m = /^\/(embed|shorts|live)\/([^/?]+)/.exec(u.pathname);
-				id = m ? m[2] : null;
-			}
-		}
-		return id && /^[\w-]{11}$/.test(id) ? id : null;
-	}
-	function createEmbed(url, { zoom = 1, sourceAspect = 16 / 9 } = {}) {
-		const id = youtubeId(url);
-		if (!id) return null;
-		const wrap = document.createElement("div");
-		wrap.style.cssText = "position:relative;overflow:hidden;container-type:size;pointer-events:none;background:#000;";
-		const frame = document.createElement("iframe");
-		frame.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
-		frame.allow = "autoplay; encrypted-media";
-		frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation");
-		frame.style.cssText = `
+(function () {
+    "use strict";
+    var Reporter = class Reporter {
+        static REPORT_ATTACHES = false;
+        name;
+        constructor(name) {
+            this.name = name;
+        }
+        static prefix = "Better ECHO360";
+        init() {
+            if (Reporter.REPORT_ATTACHES) this.report("Reporter attached");
+        }
+        stamp(input) {
+            return `[${Reporter.prefix}] [${this.name}] ${input}`;
+        }
+        tell(message) {
+            console.info(this.stamp(message));
+        }
+        report(message) {
+            console.log(this.stamp(message));
+        }
+        warn(message) {
+            console.warn(this.stamp(message));
+        }
+        scream(message) {
+            console.error(this.stamp(message));
+        }
+    };
+    function enumName(enumObj, value) {
+        return Object.keys(enumObj).find(
+            (k) => !/^\d+$/.test(k) && enumObj[k] === value,
+        );
+    }
+    var _GM_getValue = (() =>
+        typeof GM_getValue != "undefined" ? GM_getValue : void 0)();
+    var _GM_setValue = (() =>
+        typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
+    var w = (() =>
+        typeof unsafeWindow != "undefined" ? unsafeWindow : void 0)();
+    var ZustandStore = (function (ZustandStore) {
+        ZustandStore["PlayerStore"] = "playbackRate";
+        ZustandStore["TranscriptStore"] = "transcripts";
+        return ZustandStore;
+    })({});
+    var HackerService = class HackerService {
+        static stores = {};
+        static _reporter = null;
+        static get reporter() {
+            if (!HackerService._reporter) {
+                HackerService._reporter = new Reporter("Hacker");
+                HackerService._reporter.init();
+            }
+            return HackerService._reporter;
+        }
+        constructor() {}
+        static grab(store) {
+            const cached = HackerService.stores[store];
+            if (cached) return cached;
+            const found = HackerService.findStore(store);
+            if (found) HackerService.stores[store] = found;
+            return found;
+        }
+        static findStore(store) {
+            var prefix = `(${enumName(ZustandStore, store)}) `;
+            HackerService.reporter.report(prefix + "Finding");
+            var req = w.__cr;
+            if (!req) {
+                var chunkNames = [];
+                Object.keys(w).forEach(function (k) {
+                    if (/^webpackJsonp/.test(k) || /^webpackChunk/.test(k))
+                        chunkNames.push(k);
+                });
+                for (var n = 0; n < chunkNames.length; n++) {
+                    var arr = w[chunkNames[n]];
+                    if (!Array.isArray(arr)) continue;
+                    try {
+                        arr.push([
+                            [],
+                            {
+                                __grabber__: function (
+                                    module,
+                                    exports,
+                                    __webpack_require__,
+                                ) {
+                                    w.__cr = __webpack_require__;
+                                },
+                            },
+                            [["__grabber__"]],
+                        ]);
+                    } catch (e) {}
+                    if (w.__cr) {
+                        req = w.__cr;
+                        break;
+                    }
+                }
+            }
+            if (!req) {
+                this.reporter.warn(
+                    "Could not capture webpack require — no webpackJsonp/webpackChunk array found",
+                );
+                return null;
+            }
+            var cache = req.c;
+            var candidates = [];
+            for (var id in cache) {
+                var exp;
+                try {
+                    exp = cache[id] && cache[id].exports;
+                } catch (e) {
+                    continue;
+                }
+                if (!exp) continue;
+                var values;
+                try {
+                    values = [exp, exp.default].concat(Object.values(exp));
+                } catch (e) {
+                    continue;
+                }
+                for (var i = 0; i < values.length; i++) {
+                    var val = values[i];
+                    try {
+                        if (
+                            (val && typeof val.getState === "function") ||
+                            typeof val.setState === "function"
+                        )
+                            candidates.push(val);
+                    } catch (e) {}
+                }
+            }
+            this.reporter.report(
+                prefix + "Found: " + candidates.length + " candidates",
+            );
+            var match = candidates.find(function (s) {
+                try {
+                    return store.valueOf() in s.getState();
+                } catch (e) {
+                    return false;
+                }
+            });
+            w.__candidates = candidates;
+            if (!match)
+                this.reporter.warn(
+                    prefix +
+                        "No matches found, look to window.__candidates for more",
+                );
+            else this.reporter.report(prefix + "Found store");
+            return match || null;
+        }
+    };
+    var Service = class {
+        reporter;
+        constructor(name) {
+            this.reporter = new Reporter(name);
+            this.reporter.init();
+        }
+    };
+    var HardService = class extends Service {};
+    var SoftService = class extends Service {
+        enabled;
+        constructor(name) {
+            super(name);
+            this.enabled = true;
+        }
+        enable() {
+            this.reporter.tell("Service has been enabled");
+            this.enabled = true;
+            this.onToggleService();
+        }
+        disable() {
+            this.reporter.tell("Service has been disabled");
+            this.enabled = false;
+            this.onToggleService();
+        }
+        toggle() {
+            if (this.enabled) this.disable();
+            else this.enable();
+        }
+        onToggleService() {}
+    };
+    var StoreService = class extends SoftService {
+        closed = false;
+        dependencies;
+        constructor(name, dependencies) {
+            super(name);
+            this.dependencies = dependencies;
+            for (const dependency of dependencies)
+                if (!HackerService.grab(dependency)) {
+                    this.reporter.warn(
+                        "Failed to resolve all dependencies, closing service",
+                    );
+                    this.close();
+                    return;
+                }
+        }
+        close() {
+            this.reporter.scream("Service has been closed");
+            this.closed = true;
+            this.onCloseService();
+        }
+        onCloseService() {}
+    };
+    function waitForElement(selector, timeoutMs = 1e4) {
+        return new Promise((resolve) => {
+            function start() {
+                const existing = document.querySelector(selector);
+                if (existing && existing instanceof HTMLElement) {
+                    resolve(existing);
+                    return;
+                }
+                let settled = false;
+                const observer = new MutationObserver(() => {
+                    const el = document.querySelector(selector);
+                    if (el && !settled && el instanceof HTMLElement) {
+                        settled = true;
+                        observer.disconnect();
+                        clearTimeout(timeout);
+                        resolve(el);
+                    }
+                });
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                });
+                const timeout = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    observer.disconnect();
+                    resolve(null);
+                }, timeoutMs);
+            }
+            if (document.body) start();
+            else
+                document.addEventListener("DOMContentLoaded", start, {
+                    once: true,
+                });
+        });
+    }
+    var Toolbar = class Toolbar extends HardService {
+        static locating = null;
+        constructor() {
+            super("Toolbar");
+            this.locate();
+        }
+        locate() {
+            return (Toolbar.locating ??= (async () => {
+                const fullscreenButton = await waitForElement(
+                    "#fullscreen-toggle-btn",
+                );
+                if (!fullscreenButton) {
+                    this.reporter.warn(
+                        "Could not find the fullscreen button to locate the toolbar.",
+                    );
+                    return null;
+                }
+                const toolbar = fullscreenButton.parentElement;
+                if (!toolbar) {
+                    this.reporter.warn("Could not find the toolbar element.");
+                    return null;
+                }
+                return toolbar;
+            })());
+        }
+        getElement() {
+            return this.locate();
+        }
+        async addIconButton(iconClasses, handler) {
+            const toolbar = await this.getElement();
+            if (!toolbar) return;
+            const iconButton = document.createElement("button");
+            const icon = document.createElement("i");
+            icon.classList.add(...iconClasses);
+            iconButton.appendChild(icon);
+            iconButton.classList.add("icon-button-captions");
+            if (handler) iconButton.addEventListener("click", handler);
+            toolbar.prepend(iconButton);
+            return iconButton;
+        }
+    };
+    function hidden(setting) {
+        return (target) => {
+            if (!setting) return target;
+            class Stub {}
+            for (const key of Object.getOwnPropertyNames(target.prototype))
+                if (key !== "constructor") Stub.prototype[key] = () => {};
+            return Stub;
+        };
+    }
+    var defaults = {
+        better_echo360: { disabled: false },
+        phone: { hidden: false },
+        timemachine: {
+            hidden: false,
+            defaultSpeed: 1,
+            betterTimemachine: false,
+            hideNativeSpeedSelector: false,
+        },
+        syllabus: { hidden: false },
+        captions: {
+            hidden: false,
+            enabled: true,
+        },
+        reporter: { verbosity: 1 },
+    };
+    function section(name) {
+        const read = () => ({
+            ...defaults[name],
+            ..._GM_getValue(name, {}),
+        });
+        return new Proxy(
+            {},
+            {
+                get: (_, key) => read()[key],
+                set: (_, key, value) => {
+                    _GM_setValue(name, {
+                        ..._GM_getValue(name, {}),
+                        [key]: value,
+                    });
+                    return true;
+                },
+                ownKeys: () => Reflect.ownKeys(read()),
+                getOwnPropertyDescriptor: (_, key) => ({
+                    enumerable: true,
+                    configurable: true,
+                    value: read()[key],
+                }),
+            },
+        );
+    }
+    var settings = Object.fromEntries(
+        Object.keys(defaults).map((k) => [k, section(k)]),
+    );
+    window.settings = settings;
+    function __decorate(decorators, target, key, desc) {
+        var c = arguments.length,
+            r =
+                c < 3
+                    ? target
+                    : desc === null
+                      ? (desc = Object.getOwnPropertyDescriptor(target, key))
+                      : desc,
+            d;
+        if (
+            typeof Reflect === "object" &&
+            typeof Reflect.decorate === "function"
+        )
+            r = Reflect.decorate(decorators, target, key, desc);
+        else
+            for (var i = decorators.length - 1; i >= 0; i--)
+                if ((d = decorators[i]))
+                    r =
+                        (c < 3
+                            ? d(r)
+                            : c > 3
+                              ? d(target, key, r)
+                              : d(target, key)) || r;
+        return (c > 3 && r && Object.defineProperty(target, key, r), r);
+    }
+    var _CaptionsService;
+    var CaptionsService = class CaptionsService extends StoreService {
+        static {
+            _CaptionsService = this;
+        }
+        static wrapperId = "better-echo360-caption-wrapper";
+        static boxId = "better-echo360-captions";
+        currentCueEnd = -1;
+        captionsBox = null;
+        unsub = null;
+        captionsIconButton = null;
+        constructor() {
+            super("Captions", [
+                ZustandStore.PlayerStore,
+                ZustandStore.TranscriptStore,
+            ]);
+            if (this.closed) return;
+            this.init();
+        }
+        init() {
+            this.cues = this.getAllCues();
+            this.UI_AttachButtonToToolbar();
+            this.attach();
+        }
+        onToggleService() {
+            if (this.enabled) this.attach();
+            else this.destroy();
+        }
+        onCloseService() {
+            this.destroy();
+            this.UI_RemoveButtonFromToolbar();
+        }
+        cues = null;
+        fetchCount = 0;
+        stopFetching = false;
+        maxFetchAttempts = 20;
+        getAllCues() {
+            if (this.fetchCount > this.maxFetchAttempts) {
+                this.reporter.warn(
+                    "Max fetch attempts reached for cues, stopping further attempts.",
+                );
+                this.close();
+                return null;
+            }
+            this.fetchCount += 1;
+            return (
+                HackerService.grab(ZustandStore.TranscriptStore).getState()
+                    .transcripts || null
+            );
+        }
+        getCueFromTimestamp(timestamp) {
+            if (!this.cues) {
+                if (this.stopFetching) return null;
+                this.cues = this.getAllCues();
+                if (!this.cues) return null;
+            }
+            const ms = timestamp * 1e3;
+            for (var i = 0; i < this.cues.length; i++) {
+                const cue = this.cues[i];
+                if (ms >= cue.startMs && ms < cue.endMs)
+                    return {
+                        content: cue.content,
+                        end: Math.floor(cue.endMs / 1e3),
+                    };
+            }
+            return null;
+        }
+        attach() {
+            this.reporter.tell("Attaching captions box");
+            this.captionsBox = this.setupCaptionBox();
+            this.unsub = HackerService.grab(ZustandStore.PlayerStore).subscribe(
+                (state) => {
+                    const timestamp = state.currentTime;
+                    if (timestamp < this.currentCueEnd) return;
+                    const cue = this.getCueFromTimestamp(timestamp);
+                    var content = "";
+                    if (cue) {
+                        content = cue.content;
+                        this.currentCueEnd = cue.end;
+                    } else {
+                        content = "";
+                        this.currentCueEnd = -1;
+                    }
+                    this.captionsBox.textContent = content;
+                },
+            );
+        }
+        setupCaptionBox() {
+            const wrapper = document.createElement("div");
+            wrapper.id = _CaptionsService.wrapperId;
+            wrapper.style.cssText = [
+                "position:fixed",
+                "left:0",
+                "right:0",
+                "bottom:60px",
+                "width:100%",
+                "display:flex",
+                "justify-content:center",
+                "pointer-events:none",
+                "z-index:2147483647",
+            ].join(";");
+            const box = document.createElement("div");
+            box.id = _CaptionsService.boxId;
+            box.style.cssText = [
+                "max-width:80%",
+                "background:rgba(0,0,0,0.75)",
+                "color:#ffffff",
+                'font:20px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif',
+                "padding:6px 14px",
+                "border-radius:6px",
+                "text-align:center",
+                "white-space:pre-wrap",
+            ].join(";");
+            box.textContent = "";
+            wrapper.appendChild(box);
+            const attach = () => {
+                if (document.body) document.body.appendChild(wrapper);
+                else
+                    document.addEventListener("DOMContentLoaded", attach, {
+                        once: true,
+                    });
+            };
+            attach();
+            return box;
+        }
+        async UI_AttachButtonToToolbar() {
+            const button = await new Toolbar().addIconButton([
+                "ph",
+                "ph-closed-captioning",
+            ]);
+            if (!button) return;
+            button.toggleAttribute("data-enabled", this.enabled);
+            button.addEventListener("click", () => {
+                this.toggle();
+                button.toggleAttribute("data-enabled", this.enabled);
+            });
+            this.captionsIconButton = button;
+        }
+        async UI_RemoveButtonFromToolbar() {
+            if (this.captionsIconButton) {
+                this.captionsIconButton.remove();
+                this.captionsIconButton = null;
+            }
+        }
+        destroy() {
+            if (this.unsub) {
+                this.unsub();
+                this.unsub = null;
+            }
+            document.getElementById(_CaptionsService.wrapperId)?.remove();
+        }
+    };
+    CaptionsService = _CaptionsService = __decorate(
+        [hidden(settings.captions.hidden)],
+        CaptionsService,
+    );
+    function youtubeId(input) {
+        let u;
+        try {
+            u = new URL(input);
+        } catch {
+            return null;
+        }
+        const host = u.hostname.replace(/^www\.|^m\./, "");
+        let id = null;
+        if (host === "youtu.be") id = u.pathname.slice(1);
+        else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+            if (u.pathname === "/watch") id = u.searchParams.get("v");
+            else {
+                const m = /^\/(embed|shorts|live)\/([^/?]+)/.exec(u.pathname);
+                id = m ? m[2] : null;
+            }
+        }
+        return id && /^[\w-]{11}$/.test(id) ? id : null;
+    }
+    function createEmbed(url, { zoom = 1, sourceAspect = 16 / 9 } = {}) {
+        const id = youtubeId(url);
+        if (!id) return null;
+        const wrap = document.createElement("div");
+        wrap.style.cssText =
+            "position:relative;overflow:hidden;container-type:size;pointer-events:none;background:#000;";
+        const frame = document.createElement("iframe");
+        frame.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&disablekb=1&fs=0&iv_load_policy=3&rel=0&playsinline=1`;
+        frame.allow = "autoplay; encrypted-media";
+        frame.setAttribute(
+            "sandbox",
+            "allow-scripts allow-same-origin allow-presentation",
+        );
+        frame.style.cssText = `
         position:absolute; top:50%; left:50%; border:0;
         height:${zoom * 100}cqh;
         width:${zoom * 100 * sourceAspect}cqh;
         transform:translate(-50%,-50%);
     `;
-		wrap.appendChild(frame);
-		return wrap;
-	}
-	var PhoneService = class PhoneService extends SoftService {
-		static videoUrl = "https://www.youtube.com/watch?v=_bwtEtYQwgc";
-		button = null;
-		phoneEl = null;
-		constructor() {
-			super("Phone");
-			this.disable();
-			this.UI_attachButton();
-		}
-		onToggleService() {
-			this.button?.toggleAttribute("data-enabled", this.enabled);
-			if (this.enabled) this.UI_attachPhoneWindow();
-			else this.UI_removePhoneWindow();
-		}
-		async UI_attachPhoneWindow() {
-			if (this.phoneEl) return;
-			const el = createEmbed(PhoneService.videoUrl, { zoom: 1.05 });
-			if (!el) return;
-			const player = await waitForElement("[data-test-id=\"layout-display-container\"]");
-			if (!player) return;
-			player.style.position = "relative";
-			Object.assign(el.style, {
-				position: "absolute",
-				bottom: `10px`,
-				right: "10px",
-				width: "281px",
-				height: "500px",
-				zIndex: "10000",
-				borderRadius: "8px",
-				boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
-			});
-			this.phoneEl = el;
-			player.appendChild(el);
-		}
-		UI_removePhoneWindow() {
-			this.phoneEl?.remove();
-			this.phoneEl = null;
-		}
-		async UI_attachButton() {
-			const iconClass = "ph-device-mobile-speaker";
-			const toolbar = new Toolbar();
-			this.button = await toolbar.addIconButton(["ph", iconClass]) ?? null;
-			if (!this.button) return;
-			this.button.toggleAttribute("data-enabled", this.enabled);
-			this.button.addEventListener("click", () => {
-				this.toggle();
-			});
-		}
-	};
-	var TimeMachineService = class extends StoreService {
-		constructor() {
-			super("Time Machine", [ZustandStore.PlayerStore]);
-			if (this.closed) return;
-			this.setupShopInTheHeader();
-		}
-		displayBoxId = "better-echo360-box";
-		paddingOffset = 4;
-		setupShopInTheHeader() {
-			const selections = document.getElementsByClassName("header");
-			var box = document.createElement("div");
-			box.id = this.displayBoxId;
-			if (selections.length == 0) {
-				console.error("No header found");
-				box.style.cssText = [
-					"position:fixed",
-					"top:10px",
-					"right:10px",
-					"z-index:2147483647",
-					"padding:0px"
-				].join(";");
-				const attach = () => {
-					if (document.body) {
-						document.body.appendChild(box);
-						this.createSpeedSelector(box).onChange((item) => {
-							this.setPlaybackSpeed(item.speed);
-						});
-					} else document.addEventListener("DOMContentLoaded", attach, { once: true });
-				};
-				attach();
-			} else {
-				const header = selections[0];
-				const boxHeight = header.offsetHeight - 2 * this.paddingOffset;
-				box.style.cssText = [
-					"position:fixed",
-					`top:${this.paddingOffset}px`,
-					`right:${this.paddingOffset}px`,
-					"z-index:2147483647",
-					"padding:0px",
-					`height:${boxHeight}px`
-				].join(";");
-				const attach = () => {
-					if (document.body) {
-						header.appendChild(box);
-						this.createSpeedSelector(box).onChange((item) => {
-							this.setPlaybackSpeed(item.speed);
-						});
-					} else document.addEventListener("DOMContentLoaded", attach, { once: true });
-				};
-				attach();
-			}
-		}
-		createSpeedSelector(container) {
-			if (!document.getElementById("seg-styles")) {
-				var style = document.createElement("style");
-				style.id = "seg-styles";
-				style.textContent = `
-      .seg-control{--seg-radius:5px;position:relative;display:flex;gap:2px;width:200px;height:100%;box-sizing:border-box;background:#ffffff;border-radius:var(--seg-radius);padding:3px;user-select:none;-webkit-user-select:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
-      .seg-highlight{position:absolute;top:3px;left:3px;height:calc(100% - 6px);width:calc((100% - 6px) / 5);background:rgba(0,0,0,0.05);border-radius:var(--seg-radius);box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:1}
-      .seg-item{position:relative;flex:1;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;color:#8e8d89;z-index:2;transition:color .2s,font-weight .2s}
-      .seg-item.active{color:#000000;font-weight:600}
-    `;
-				document.head.appendChild(style);
-			}
-			var speeds = [
-				{
-					speed: 1,
-					label: "1x"
-				},
-				{
-					speed: 1.5,
-					label: "1.5x"
-				},
-				{
-					speed: 2,
-					label: "2x"
-				},
-				{
-					speed: 2.5,
-					label: "2.5x"
-				},
-				{
-					speed: 3,
-					label: "3x"
-				}
-			];
-			var control = document.createElement("div");
-			control.className = "seg-control";
-			control.tabIndex = 0;
-			control.innerHTML = "<div class=\"seg-highlight\"></div>" + speeds.map(function(s, i) {
-				return "<div class=\"seg-item\" data-i=\"" + i + "\">" + s.label + "</div>";
-			}).join("");
-			container.appendChild(control);
-			var highlight = control.querySelector(".seg-highlight");
-			var items = control.querySelectorAll(".seg-item");
-			var n = items.length;
-			var index = 0;
-			var dragging = false;
-			var onChangeFn = null;
-			function render() {
-				highlight.style.transform = "translateX(" + index * 100 + "%)";
-				items.forEach(function(el, i) {
-					el.classList.toggle("active", i === index);
-				});
-			}
-			function setIndex(i) {
-				i = Math.max(0, Math.min(n - 1, i));
-				if (i === index) return;
-				index = i;
-				render();
-				if (onChangeFn) onChangeFn(speeds[index], index);
-			}
-			function indexFromX(clientX) {
-				var rect = control.getBoundingClientRect();
-				var pct = Math.max(0, Math.min(.999, (clientX - rect.left) / rect.width));
-				return Math.floor(pct * n);
-			}
-			function down(e) {
-				dragging = true;
-				highlight.style.transition = "none";
-				setIndex(indexFromX(e.touches ? e.touches[0].clientX : e.clientX));
-				e.preventDefault();
-			}
-			function move(e) {
-				if (!dragging) return;
-				setIndex(indexFromX(e.touches ? e.touches[0].clientX : e.clientX));
-			}
-			function up() {
-				if (!dragging) return;
-				dragging = false;
-				highlight.style.transition = "";
-			}
-			control.addEventListener("mousedown", down);
-			control.addEventListener("touchstart", down, { passive: false });
-			window.addEventListener("mousemove", move);
-			window.addEventListener("touchmove", move, { passive: false });
-			window.addEventListener("mouseup", up);
-			window.addEventListener("touchend", up);
-			control.addEventListener("keydown", function(e) {
-				if (e.key === "ArrowRight") {
-					setIndex(index + 1);
-					e.preventDefault();
-				}
-				if (e.key === "ArrowLeft") {
-					setIndex(index - 1);
-					e.preventDefault();
-				}
-			});
-			render();
-			return {
-				get: function() {
-					return speeds[index];
-				},
-				set: function(i) {
-					setIndex(i);
-				},
-				onChange: function(fn) {
-					onChangeFn = fn;
-				}
-			};
-		}
-		setPlaybackSpeed(speed) {
-			var targetSpeed = speed || 1;
-			try {
-				HackerService.grab(ZustandStore.PlayerStore).getState().onPlaybackRateChange(targetSpeed);
-			} catch (e) {
-				this.reporter.scream("Something went wrong on rate change");
-				console.error(e);
-			}
-		}
-	};
-	function lesson() {
-		window.addEventListener("load", function() {
-			new TimeMachineService();
-			new CaptionsService();
-			new PhoneService();
-		});
-	}
-	var DEFAULT_CONFIG = {
-		lang: void 0,
-		message: void 0,
-		abortEarly: void 0,
-		abortPipeEarly: void 0
-	};
-	function getGlobalConfig(config$1) {
-		if (!config$1 && true) return DEFAULT_CONFIG;
-		return {
-			lang: config$1?.lang ?? void 0,
-			message: config$1?.message,
-			abortEarly: config$1?.abortEarly ?? void 0,
-			abortPipeEarly: config$1?.abortPipeEarly ?? void 0
-		};
-	}
-	function _stringify(input) {
-		const type = typeof input;
-		if (type === "string") return `"${input}"`;
-		if (type === "number" || type === "bigint" || type === "boolean") return `${input}`;
-		if (type === "object" || type === "function") return (input && Object.getPrototypeOf(input)?.constructor?.name) ?? "null";
-		return type;
-	}
-	function _addIssue(context, label, dataset, config$1, other) {
-		const input = other && "input" in other ? other.input : dataset.value;
-		const expected = other?.expected ?? context.expects ?? null;
-		const received = other?.received ?? _stringify(input);
-		const issue = {
-			kind: context.kind,
-			type: context.type,
-			input,
-			expected,
-			received,
-			message: `Invalid ${label}: ${expected ? `Expected ${expected} but r` : "R"}eceived ${received}`,
-			requirement: context.requirement,
-			path: other?.path,
-			issues: other?.issues,
-			lang: config$1.lang,
-			abortEarly: config$1.abortEarly,
-			abortPipeEarly: config$1.abortPipeEarly
-		};
-		const isSchema = context.kind === "schema";
-		const message$1 = other?.message ?? context.message ?? (context.reference, issue.lang, void 0) ?? (isSchema ? (issue.lang, void 0) : null) ?? config$1.message ?? (issue.lang, void 0);
-		if (message$1 !== void 0) issue.message = typeof message$1 === "function" ? message$1(issue) : message$1;
-		if (isSchema) dataset.typed = false;
-		if (dataset.issues) dataset.issues.push(issue);
-		else dataset.issues = [issue];
-	}
-	function _isSameValueZero(value1, value2) {
-		return value1 === value2 || Number.isNaN(value1) && Number.isNaN(value2);
-	}
-	function _standardSchema(schema) {
-		schema["~standard"] = {
-			version: 1,
-			vendor: "valibot",
-			validate: (value$1) => schema["~run"]({ value: value$1 }, getGlobalConfig())
-		};
-		return schema;
-	}
-	function transform(operation) {
-		return {
-			kind: "transformation",
-			type: "transform",
-			reference: transform,
-			async: false,
-			operation,
-			"~run"(dataset) {
-				dataset.value = this.operation(dataset.value);
-				return dataset;
-			}
-		};
-	}
-	function getFallback(schema, dataset, config$1) {
-		return typeof schema.fallback === "function" ? schema.fallback(dataset, config$1) : schema.fallback;
-	}
-	function getDefault(schema, dataset, config$1) {
-		return typeof schema.default === "function" ? schema.default(dataset, config$1) : schema.default;
-	}
-	function array(item, message$1) {
-		return _standardSchema({
-			kind: "schema",
-			type: "array",
-			reference: array,
-			expects: "Array",
-			async: false,
-			item,
-			message: message$1,
-			"~run"(dataset, config$1) {
-				const input = dataset.value;
-				if (Array.isArray(input)) {
-					dataset.typed = true;
-					dataset.value = [];
-					for (let key = 0; key < input.length; key++) {
-						const value$1 = input[key];
-						const itemDataset = this.item["~run"]({ value: value$1 }, config$1);
-						if (itemDataset.issues) {
-							const pathItem = {
-								type: "array",
-								origin: "value",
-								input,
-								key,
-								value: value$1
-							};
-							for (const issue of itemDataset.issues) {
-								if (issue.path) issue.path.unshift(pathItem);
-								else issue.path = [pathItem];
-								dataset.issues?.push(issue);
-							}
-							if (!dataset.issues) dataset.issues = itemDataset.issues;
-							if (config$1.abortEarly) {
-								dataset.typed = false;
-								break;
-							}
-						}
-						if (!itemDataset.typed) dataset.typed = false;
-						dataset.value.push(itemDataset.value);
-					}
-				} else _addIssue(this, "type", dataset, config$1);
-				return dataset;
-			}
-		});
-	}
-	function literal(literal_, message$1) {
-		return _standardSchema({
-			kind: "schema",
-			type: "literal",
-			reference: literal,
-			expects: _stringify(literal_),
-			async: false,
-			literal: literal_,
-			message: message$1,
-			"~run"(dataset, config$1) {
-				if (_isSameValueZero(dataset.value, this.literal)) dataset.typed = true;
-				else _addIssue(this, "type", dataset, config$1);
-				return dataset;
-			}
-		});
-	}
-	function object(entries$1, message$1) {
-		return _standardSchema({
-			kind: "schema",
-			type: "object",
-			reference: object,
-			expects: "Object",
-			async: false,
-			entries: entries$1,
-			message: message$1,
-			"~run"(dataset, config$1) {
-				const input = dataset.value;
-				if (input && typeof input === "object") {
-					dataset.typed = true;
-					dataset.value = {};
-					for (const key in this.entries) {
-						const valueSchema = this.entries[key];
-						if (key in input || (valueSchema.type === "exact_optional" || valueSchema.type === "optional" || valueSchema.type === "nullish") && valueSchema.default !== void 0) {
-							const value$1 = key in input ? input[key] : getDefault(valueSchema);
-							const valueDataset = valueSchema["~run"]({ value: value$1 }, config$1);
-							if (valueDataset.issues) {
-								const pathItem = {
-									type: "object",
-									origin: "value",
-									input,
-									key,
-									value: value$1
-								};
-								for (const issue of valueDataset.issues) {
-									if (issue.path) issue.path.unshift(pathItem);
-									else issue.path = [pathItem];
-									dataset.issues?.push(issue);
-								}
-								if (!dataset.issues) dataset.issues = valueDataset.issues;
-								if (config$1.abortEarly) {
-									dataset.typed = false;
-									break;
-								}
-							}
-							if (!valueDataset.typed) dataset.typed = false;
-							dataset.value[key] = valueDataset.value;
-						} else if (valueSchema.fallback !== void 0) dataset.value[key] = getFallback(valueSchema);
-						else if (valueSchema.type !== "exact_optional" && valueSchema.type !== "optional" && valueSchema.type !== "nullish") {
-							_addIssue(this, "key", dataset, config$1, {
-								input: void 0,
-								expected: `"${key}"`,
-								path: [{
-									type: "object",
-									origin: "key",
-									input,
-									key,
-									value: input[key]
-								}]
-							});
-							if (config$1.abortEarly) break;
-						}
-					}
-				} else _addIssue(this, "type", dataset, config$1);
-				return dataset;
-			}
-		});
-	}
-	function optional(wrapped, default_) {
-		return _standardSchema({
-			kind: "schema",
-			type: "optional",
-			reference: optional,
-			expects: `(${wrapped.expects} | undefined)`,
-			async: false,
-			wrapped,
-			default: default_,
-			"~run"(dataset, config$1) {
-				if (dataset.value === void 0) {
-					if (this.default !== void 0) dataset.value = getDefault(this, dataset, config$1);
-					if (dataset.value === void 0) {
-						dataset.typed = true;
-						return dataset;
-					}
-				}
-				return this.wrapped["~run"](dataset, config$1);
-			}
-		});
-	}
-	function string(message$1) {
-		return _standardSchema({
-			kind: "schema",
-			type: "string",
-			reference: string,
-			expects: "string",
-			async: false,
-			message: message$1,
-			"~run"(dataset, config$1) {
-				if (typeof dataset.value === "string") dataset.typed = true;
-				else _addIssue(this, "type", dataset, config$1);
-				return dataset;
-			}
-		});
-	}
-	function pipe(...pipe$1) {
-		return _standardSchema({
-			...pipe$1[0],
-			pipe: pipe$1,
-			"~run"(dataset, config$1) {
-				for (const item of pipe$1) if (item.kind !== "metadata") {
-					if (dataset.issues && (item.kind === "schema" || item.kind === "transformation")) {
-						dataset.typed = false;
-						break;
-					}
-					if (!dataset.issues || !config$1.abortEarly && !config$1.abortPipeEarly) dataset = item["~run"](dataset, config$1);
-				}
-				return dataset;
-			}
-		});
-	}
-	function safeParse(schema, input, config$1) {
-		const dataset = schema["~run"]({ value: input }, getGlobalConfig(config$1));
-		return {
-			typed: dataset.typed,
-			success: !dataset.issues,
-			output: dataset.value,
-			issues: dataset.issues
-		};
-	}
-	var SyllabusDateTimeSchema = pipe(string(), transform((input) => {
-		const date = new Date(input);
-		date.setSeconds(0, 0);
-		return date;
-	}));
-	var SyllabusListSchema = array(pipe(object({
-		type: literal("SyllabusLessonType"),
-		lesson: object({
-			captureStartedAt: optional(SyllabusDateTimeSchema),
-			captureEndedAt: optional(SyllabusDateTimeSchema),
-			startTimeUTC: SyllabusDateTimeSchema,
-			endTimeUTC: SyllabusDateTimeSchema,
-			lesson: object({ id: string() })
-		})
-	}), transform((input) => ({
-		id: input.lesson.lesson.id,
-		startDate: input.lesson.captureStartedAt ?? input.lesson.startTimeUTC,
-		endDate: input.lesson.captureEndedAt ?? input.lesson.endTimeUTC
-	}))));
-	var SyllabusService = class extends HardService {
-		courseId;
-		items = [];
-		constructor(courseId) {
-			super("Syllabus");
-			this.courseId = courseId;
-		}
-		async init() {
-			try {
-				const json = await (await fetch(`https://echo360.net.au/section/${this.courseId}/syllabus`, {
-					credentials: "include",
-					method: "GET",
-					mode: "cors"
-				})).json();
-				if (!json.data) {
-					this.reporter.warn("Syllabus response had no data field");
-					return false;
-				}
-				const syllabusItems = safeParse(SyllabusListSchema, json.data);
-				if (!syllabusItems.success) {
-					this.reporter.warn("Failed to parse syllabus items, read below");
-					console.log(syllabusItems.issues);
-					return false;
-				}
-				this.reporter.tell("Successfully read and parsed the syllabus");
-				this.items = syllabusItems.output;
-				return true;
-			} catch (e) {
-				this.reporter.scream("Syllabus fetch threw an error: " + e);
-				return false;
-			}
-		}
-		isSameDay(a, b) {
-			return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-		}
-		findLessonsByDate(date) {
-			return this.items.filter((item) => this.isSameDay(item.startDate, date));
-		}
-		getTodaysLessons() {
-			const today = new Date();
-			return this.findLessonsByDate(today);
-		}
-	};
-	function LessonList(courseId) {
-		const syllabus = new SyllabusService(courseId);
-		syllabus.init().then((success) => {
-			if (success) attachJumpButton();
-		});
-		function buildPlatform() {
-			const platform = document.createElement("div");
-			platform.classList.add("syllabus-options-box");
-			return platform;
-		}
-		function buildButtonGroup() {
-			const buttonGroup = document.createElement("div");
-			buttonGroup.classList.add("syllabus-button-group");
-			return buttonGroup;
-		}
-		function buildJumpButtonOnto(parent, handler) {
-			const jumpButton = document.createElement("button");
-			jumpButton.textContent = "Jump to today's lesson";
-			jumpButton.classList.add("jump-button");
-			jumpButton.addEventListener("click", handler);
-			parent.appendChild(jumpButton);
-		}
-		function buildWatchButtonOnto(parent, handler) {
-			const watchButton = document.createElement("button");
-			watchButton.textContent = "Watch today's lesson";
-			watchButton.classList.add("watch-button");
-			watchButton.addEventListener("click", handler);
-			parent.appendChild(watchButton);
-		}
-		function buildOptionsButtonOnto(parent, handler) {
-			const optionsButton = document.createElement("button");
-			optionsButton.classList.add("options-button");
-			optionsButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" color="currentColor" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21.3175 7.14139L20.8239 6.28479C20.4506 5.63696 20.264 5.31305 19.9464 5.18388C19.6288 5.05472 19.2696 5.15664 18.5513 5.36048L17.3311 5.70418C16.8725 5.80994 16.3913 5.74994 15.9726 5.53479L15.6357 5.34042C15.2766 5.11043 15.0004 4.77133 14.8475 4.37274L14.5136 3.37536C14.294 2.71534 14.1842 2.38533 13.9228 2.19657C13.6615 2.00781 13.3143 2.00781 12.6199 2.00781H11.5051C10.8108 2.00781 10.4636 2.00781 10.2022 2.19657C9.94085 2.38533 9.83106 2.71534 9.61149 3.37536L9.27753 4.37274C9.12465 4.77133 8.84845 5.11043 8.48937 5.34042L8.15249 5.53479C7.73374 5.74994 7.25259 5.80994 6.79398 5.70418L5.57375 5.36048C4.85541 5.15664 4.49625 5.05472 4.17867 5.18388C3.86109 5.31305 3.67445 5.63696 3.30115 6.28479L2.80757 7.14139C2.45766 7.74864 2.2827 8.05227 2.31666 8.37549C2.35061 8.69871 2.58483 8.95918 3.05326 9.48012L4.0843 10.6328C4.3363 10.9518 4.51521 11.5078 4.51521 12.0077C4.51521 12.5078 4.33636 13.0636 4.08433 13.3827L3.05326 14.5354C2.58483 15.0564 2.35062 15.3168 2.31666 15.6401C2.2827 15.9633 2.45766 16.2669 2.80757 16.8741L3.30114 17.7307C3.67443 18.3785 3.86109 18.7025 4.17867 18.8316C4.49625 18.9608 4.85542 18.8589 5.57377 18.655L6.79394 18.3113C7.25263 18.2055 7.73387 18.2656 8.15267 18.4808L8.4895 18.6752C8.84851 18.9052 9.12464 19.2442 9.2775 19.6428L9.61149 20.6403C9.83106 21.3003 9.94085 21.6303 10.2022 21.8191C10.4636 22.0078 10.8108 22.0078 11.5051 22.0078H12.6199C13.3143 22.0078 13.6615 22.0078 13.9228 21.8191C14.1842 21.6303 14.294 21.3003 14.5136 20.6403L14.8476 19.6428C15.0004 19.2442 15.2765 18.9052 15.6356 18.6752L15.9724 18.4808C16.3912 18.2656 16.8724 18.2055 17.3311 18.3113L18.5513 18.655C19.2696 18.8589 19.6288 18.9608 19.9464 18.8316C20.264 18.7025 20.4506 18.3785 20.8239 17.7307L21.3175 16.8741C21.6674 16.2669 21.8423 15.9633 21.8084 15.6401C21.7744 15.3168 21.5402 15.0564 21.0718 14.5354L20.0407 13.3827C19.7887 13.0636 19.6098 12.5078 19.6098 12.0077C19.6098 11.5078 19.7888 10.9518 20.0407 10.6328L21.0718 9.48012C21.5402 8.95918 21.7744 8.69871 21.8084 8.37549C21.8423 8.05227 21.6674 7.74864 21.3175 7.14139Z" stroke-linecap="round"></path>
-                <path d="M15.5195 12C15.5195 13.933 13.9525 15.5 12.0195 15.5C10.0865 15.5 8.51953 13.933 8.51953 12C8.51953 10.067 10.0865 8.5 12.0195 8.5C13.9525 8.5 15.5195 10.067 15.5195 12Z"></path>
-            </svg>
-            `;
-			optionsButton.addEventListener("click", handler);
-			parent.appendChild(optionsButton);
-		}
-		async function attachJumpButton() {
-			const todays = syllabus.getTodaysLessons();
-			if (todays.length == 0) {
-				console.info("No lessons today");
-				return;
-			}
-			const first = todays[0];
-			const lessonElement = await waitForElement(`[data-test-lessonid="${first.id}"]`);
-			if (!lessonElement) {
-				console.error("Something went wrong, no element found for lesson ", first.id);
-				return;
-			}
-			const platform = buildPlatform();
-			const buttonGroup = buildButtonGroup();
-			buildJumpButtonOnto(buttonGroup, () => {
-				lessonElement.scrollIntoView({ behavior: "smooth" });
-				const ring = createHighlightRing(lessonElement);
-				setTimeout(() => {
-					ring.remove();
-				}, 1500);
-			});
-			buildWatchButtonOnto(buttonGroup, () => {
-				window.location.assign(`https://echo360.net.au/lesson/${first.id}/classroom`);
-			});
-			buildOptionsButtonOnto(buttonGroup, () => {
-				alert("havent built this yet");
-			});
-			platform.prepend(buttonGroup);
-			document.body.appendChild(platform);
-		}
-		function createHighlightRing(target) {
-			const ring = document.createElement("div");
-			ring.className = "be360-highlight-ring";
-			document.body.appendChild(ring);
-			const ringPadding = 3;
-			function position() {
-				const rect = target.getBoundingClientRect();
-				ring.style.top = `${rect.top - ringPadding}px`;
-				ring.style.left = `${rect.left - ringPadding}px`;
-				ring.style.width = `${rect.width + 6}px`;
-				ring.style.height = `${rect.height + 6}px`;
-			}
-			position();
-			window.addEventListener("scroll", position, true);
-			window.addEventListener("resize", position);
-			return ring;
-		}
-	}
-	var RouterService = class RouterService extends HardService {
-		static routes = [{
-			name: "Lesson",
-			matcher: (location) => {
-				return { matches: location.pathname.includes("/lesson") };
-			},
-			handler: () => {
-				lesson();
-			}
-		}, {
-			name: "Lessons List",
-			matcher: (location) => {
-				const match = location.pathname.match("/section/(?<course_id>.+)/home");
-				if (match && match.groups) {
-					const courseId = match.groups["course_id"];
-					if (courseId) return {
-						matches: true,
-						data: { courseId }
-					};
-				}
-				return { matches: false };
-			},
-			handler: (data) => {
-				LessonList(data.courseId);
-			}
-		}];
-		constructor() {
-			super("Router");
-		}
-		route() {
-			var location = window.location;
-			for (const route of RouterService.routes) {
-				const result = route.matcher(location);
-				if (result.matches) {
-					this.reporter.tell(`Matched route for (${route.name})`);
-					route.handler(result.data);
-					return;
-				}
-			}
-			this.reporter.warn(`No route matched for ${location.pathname}`);
-		}
-		init() {
-			this.route();
-		}
-	};
-	var style_default = ":root {\n    --primary-color: #d5006c;\n    --primary-color-darker:#b3005c;\n    --primary-color-faded: #ffcce6;\n}\n\n.be360-highlight-ring {\n    isolation: isolate;\n    position: fixed;\n    border: 7px solid var(--primary-color);\n    border-radius: 7px;\n    box-sizing: border-box;\n    pointer-events: none;\n    z-index: 2147483647;\n    opacity: 0; /* starts invisible, animation takes over from here */\n    animation: be360-ring-pulse 1.5s ease-in-out forwards;\n}\n\n@keyframes be360-ring-pulse {\n    0% {\n        opacity: 0;\n    }\n    15% {\n        opacity: 1;\n    }\n    85% {\n        opacity: 1;\n    }\n    100% {\n        opacity: 0;\n    }\n}\n\n.syllabus-options-box {\n    position: fixed;\n    display: flex;\n    flex-direction: column;\n    bottom: 0px;\n    right: 10px;\n    background-color: #f7f7f7;\n    border: 1px solid #eee1e3;\n    border-radius: 30px;\n    border-end-end-radius: 0px;\n    border-bottom-left-radius: 0px;\n    padding: 10px;\n    padding-bottom: 15px;\n    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);\n    z-index: 9999;\n\n    font-size: 14px;\n    color: lightslategray;\n\n    align-items: center;\n    gap: 10px;\n\n    animation: platform-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;\n}\n\n@keyframes platform-pop-in {\n    0% {\n        transform: translateY(40px) scale(0.9);\n    }\n    100% {\n        transform: translateY(0) scale(1);\n    }\n}\n\n.syllabus-button-group {\n    display: flex;\n    flex-direction: row;\n    gap: 2px;\n    width: 440px;\n}\n\n.watch-button {\n    position: relative;\n    padding: 10px 0;\n    background-color: var(--primary-color);\n    color: #fff;\n    border: none;\n    flex: 1;\n    height: 40px;\n    border-radius: 20px;\n    border-top-left-radius: 5px;\n    border-bottom-left-radius: 5px;\n    cursor: pointer;\n    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);\n}\n\n.jump-button {\n    position: relative;\n    padding: 10px 0;\n    flex: 1;\n    height: 40px;\n    background-color: var(--primary-color-faded);\n    color: var(--primary-color);\n    border: none;\n    border-radius: 20px;\n    border-top-right-radius: 5px;\n    border-bottom-right-radius: 5px;\n    cursor: pointer;\n    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);\n\n    font-weight: semibold;\n}\n\n.options-button {\n    position: relative;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    height: 40px;\n    aspect-ratio: 1;\n    border-radius: 20px;\n    background-color: gainsboro;\n    border: none;\n    margin-left: 6px;\n    transition: all 0.8s cubic-bezier(0.34, 1, 0.64, 1);\n}\n\n.jump-button:hover,\n.watch-button:hover {\n    flex: 1.25;\n}\n\n.options-button:hover {\n    rotate: 180deg;\n}\n\n.icon-button-captions {\n    height: 2rem;\n    aspect-ratio: 1;\n    background: transparent;\n    color: white;\n    border: none;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    padding: 4px;\n    font-size: 22px;\n    border-radius: 2px;\n    cursor: pointer;\n}\n\n.icon-button-captions:hover {\n    background: white;\n    color: black;\n}\n\n.icon-button-captions:active {\n    background: rgba(255, 255, 255, 0.5);\n    color: black;\n}\n\n.icon-button-captions:focus:not(:focus-visible) {\n  outline: none;\n}\n\n.icon-button-captions[data-enabled] {\n    background: var(--primary-color);\n    color: white;\n}\n\n.icon-button-captions[data-enabled]:hover {\n    background: var(--primary-color-darker);\n}\n";
-	var ArtistService = class extends HardService {
-		constructor() {
-			super("Artist");
-		}
-		paint() {
-			const style = document.createElement("style");
-			style.id = "be360-styles";
-			style.textContent = style_default;
-			this.reporter.report("Injected the stylesheet from style.css");
-			document.head.appendChild(style);
-			const PHOSPHOR_BASE = "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
-			const injectStylesheet = (href) => {
-				const link = document.createElement("link");
-				link.rel = "stylesheet";
-				link.type = "text/css";
-				link.href = href;
-				document.head.appendChild(link);
-				this.reporter.report(`Injected the stylesheet with the href: ${href}`);
-				return link;
-			};
-			injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
-			injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
-		}
-	};
-	(function() {
-		"use strict";
-		new ArtistService().paint();
-		new RouterService().init();
-	})();
+        wrap.appendChild(frame);
+        return wrap;
+    }
+    var _PhoneService;
+    var PhoneService = class PhoneService extends SoftService {
+        static {
+            _PhoneService = this;
+        }
+        static videoUrl = "https://www.youtube.com/watch?v=_bwtEtYQwgc";
+        button = null;
+        phoneEl = null;
+        constructor() {
+            super("Phone");
+            this.disable();
+            this.UI_attachButton();
+        }
+        onToggleService() {
+            this.button?.toggleAttribute("data-enabled", this.enabled);
+            if (this.enabled) this.UI_attachPhoneWindow();
+            else this.UI_removePhoneWindow();
+        }
+        async UI_attachPhoneWindow() {
+            if (this.phoneEl) return;
+            const el = createEmbed(_PhoneService.videoUrl, { zoom: 1.05 });
+            if (!el) return;
+            const player = await waitForElement(
+                '[data-test-id="layout-display-container"]',
+            );
+            if (!player) return;
+            player.style.position = "relative";
+            Object.assign(el.style, {
+                position: "absolute",
+                bottom: `10px`,
+                right: "10px",
+                width: "281px",
+                height: "500px",
+                zIndex: "10000",
+                borderRadius: "8px",
+                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+            });
+            this.phoneEl = el;
+            player.appendChild(el);
+        }
+        UI_removePhoneWindow() {
+            this.phoneEl?.remove();
+            this.phoneEl = null;
+        }
+        async UI_attachButton() {
+            const iconClass = "ph-device-mobile-speaker";
+            const toolbar = new Toolbar();
+            this.button =
+                (await toolbar.addIconButton(["ph", iconClass])) ?? null;
+            if (!this.button) return;
+            this.button.toggleAttribute("data-enabled", this.enabled);
+            this.button.addEventListener("click", () => {
+                this.toggle();
+            });
+        }
+    };
+    PhoneService = _PhoneService = __decorate(
+        [hidden(settings.phone.hidden)],
+        PhoneService,
+    );
+    function fromTemplate(html) {
+        const tpl = document.createElement("template");
+        tpl.innerHTML = html.trim();
+        return tpl.content.firstElementChild;
+    }
+    var timemachine_default =
+        '<dialog class="speed-popover" id="be360-speed-popover" popover>\n    <div class="button-row">\n        <button\n            type="button"\n            class="plus"\n            id="decrease-speed"\n            data-delta="-0.1"\n        >\n            <i class="ph-bold ph-minus"></i>\n        </button>\n        <p id="current-speed">{}x</p>\n        <button type="button" class="plus" id="increase-speed" data-delta="0.1">\n            <i class="ph-bold ph-plus"></i>\n        </button>\n    </div>\n    <div class="button-row">\n        <button type="button" data-speed="1">1×</button>\n        <button type="button" data-speed="1.5">1.5×</button>\n        <button type="button" data-speed="2">2×</button>\n        <button type="button" data-speed="2.5">2.5×</button>\n        <button type="button" data-speed="3">3×</button>\n        <button type="button" data-speed="3.5">3.5×</button>\n    </div>\n    <p class="total-time-p" id="sum-lecture-time">\n        Total lecture time is {} mins\n    </p>\n</dialog>\n';
+    var prefix = "Better ECHO360";
+    function reporter(target) {
+        target.prototype.report = function (...args) {
+            console.log(`[${prefix} | ${this.constructor.name}]`, ...args);
+        };
+        target.prototype.warn = function (...args) {
+            console.warn(`[${prefix} | ${this.constructor.name}]`, ...args);
+        };
+        target.prototype.yell = function (...args) {
+            console.error(`[${prefix} | ${this.constructor.name}]`, ...args);
+        };
+        return target;
+    }
+    var TimeMachineService = class TimeMachineService extends StoreService {
+        popover = null;
+        button = null;
+        quickActionCloseDelay = 150;
+        quickActionCloseTimeout = void 0;
+        constructor() {
+            super("Time Machine", [ZustandStore.PlayerStore]);
+            if (this.closed) return;
+            this.UI.init();
+            if (settings.timemachine.hideNativeSpeedSelector)
+                waitForElement("#playback-speed-menu-menu-toggle-btn").then(
+                    (element) => {
+                        if (element) element.style.display = "none";
+                    },
+                );
+        }
+        getPlaybackSpeed() {
+            try {
+                return HackerService.grab(ZustandStore.PlayerStore).getState()
+                    .playbackRate;
+            } catch (e) {
+                this.reporter.scream("Something went wrong on rate get");
+                console.error(e);
+                return 1;
+            }
+        }
+        setPlaybackSpeed(speed) {
+            try {
+                HackerService.grab(ZustandStore.PlayerStore)
+                    .getState()
+                    .onPlaybackRateChange(speed);
+            } catch (e) {
+                this.reporter.scream("Something went wrong on rate change");
+                console.error(e);
+            }
+        }
+        UI = {
+            init: async () => {
+                await this.UI.attachButtonToToolbar();
+                this.UI.attachPopover();
+                this.UI.updatePopover();
+            },
+            attachButtonToToolbar: async () => {
+                const button = await new Toolbar().addIconButton([
+                    "ph",
+                    "ph-speedometer",
+                ]);
+                if (!button) return;
+                button.id = "timemachine-button";
+                this.button = button;
+            },
+            attachPopover: () => {
+                const popover = fromTemplate(timemachine_default);
+                this.popover = popover;
+                if (!this.button || !this.popover) return;
+                this.button.setAttribute("popovertarget", popover.id);
+                this.popover
+                    .querySelectorAll("button[data-speed]")
+                    .forEach((button) => {
+                        button.addEventListener("click", () => {
+                            const speed = parseFloat(
+                                button.getAttribute("data-speed") || "1",
+                            );
+                            this.setPlaybackSpeed(speed);
+                            this.UI.updatePopover();
+                            clearTimeout(this.quickActionCloseTimeout);
+                            this.quickActionCloseTimeout = window.setTimeout(
+                                () => {
+                                    this.popover?.hidePopover();
+                                },
+                                this.quickActionCloseDelay,
+                            );
+                        });
+                    });
+                this.popover
+                    .querySelectorAll("button[data-delta]")
+                    .forEach((button) => {
+                        button.addEventListener("click", () => {
+                            const delta = parseFloat(
+                                button.getAttribute("data-delta") || "0",
+                            );
+                            const currentSpeed = this.getPlaybackSpeed();
+                            const newSpeed =
+                                Math.round((currentSpeed + delta) * 10) / 10;
+                            this.setPlaybackSpeed(newSpeed);
+                            this.UI.updatePopover();
+                        });
+                    });
+                this.button.appendChild(popover);
+            },
+            updatePopover: () => {
+                if (!this.popover) return;
+                const playbackSpeed = HackerService.grab(
+                    ZustandStore.PlayerStore,
+                ).getState().playbackRate;
+                const adjustedDuration =
+                    HackerService.grab(ZustandStore.PlayerStore).getState()
+                        .duration / playbackSpeed;
+                const adjustedDurationMins = Math.ceil(adjustedDuration / 60);
+                const currentSpeedLabel =
+                    this.popover.querySelector("#current-speed");
+                if (currentSpeedLabel)
+                    currentSpeedLabel.textContent = `${playbackSpeed}x`;
+                const adjustedDurationLabel =
+                    this.popover.querySelector("#sum-lecture-time");
+                if (adjustedDurationLabel)
+                    adjustedDurationLabel.textContent = `Total lecture time is ${adjustedDurationMins} mins`;
+            },
+        };
+    };
+    TimeMachineService = __decorate(
+        [hidden(settings.timemachine.hidden), reporter],
+        TimeMachineService,
+    );
+    function lesson() {
+        new TimeMachineService();
+        new CaptionsService();
+        new PhoneService();
+    }
+    var syllabusPlatform_default =
+        '<div class="syllabus-options-box">\n    <div class="syllabus-button-group">\n        <button class="jump-button">Jump to today\'s lesson</button>\n        <button class="watch-button">Watch today\'s lesson</button>\n    </div>\n</div>\n';
+    var DEFAULT_CONFIG = {
+        lang: void 0,
+        message: void 0,
+        abortEarly: void 0,
+        abortPipeEarly: void 0,
+    };
+    function getGlobalConfig(config$1) {
+        if (!config$1 && true) return DEFAULT_CONFIG;
+        return {
+            lang: config$1?.lang ?? void 0,
+            message: config$1?.message,
+            abortEarly: config$1?.abortEarly ?? void 0,
+            abortPipeEarly: config$1?.abortPipeEarly ?? void 0,
+        };
+    }
+    function _stringify(input) {
+        const type = typeof input;
+        if (type === "string") return `"${input}"`;
+        if (type === "number" || type === "bigint" || type === "boolean")
+            return `${input}`;
+        if (type === "object" || type === "function")
+            return (
+                (input && Object.getPrototypeOf(input)?.constructor?.name) ??
+                "null"
+            );
+        return type;
+    }
+    function _addIssue(context, label, dataset, config$1, other) {
+        const input = other && "input" in other ? other.input : dataset.value;
+        const expected = other?.expected ?? context.expects ?? null;
+        const received = other?.received ?? _stringify(input);
+        const issue = {
+            kind: context.kind,
+            type: context.type,
+            input,
+            expected,
+            received,
+            message: `Invalid ${label}: ${expected ? `Expected ${expected} but r` : "R"}eceived ${received}`,
+            requirement: context.requirement,
+            path: other?.path,
+            issues: other?.issues,
+            lang: config$1.lang,
+            abortEarly: config$1.abortEarly,
+            abortPipeEarly: config$1.abortPipeEarly,
+        };
+        const isSchema = context.kind === "schema";
+        const message$1 =
+            other?.message ??
+            context.message ??
+            (context.reference, issue.lang, void 0) ??
+            (isSchema ? (issue.lang, void 0) : null) ??
+            config$1.message ??
+            (issue.lang, void 0);
+        if (message$1 !== void 0)
+            issue.message =
+                typeof message$1 === "function" ? message$1(issue) : message$1;
+        if (isSchema) dataset.typed = false;
+        if (dataset.issues) dataset.issues.push(issue);
+        else dataset.issues = [issue];
+    }
+    function _isSameValueZero(value1, value2) {
+        return (
+            value1 === value2 || (Number.isNaN(value1) && Number.isNaN(value2))
+        );
+    }
+    function _standardSchema(schema) {
+        schema["~standard"] = {
+            version: 1,
+            vendor: "valibot",
+            validate: (value$1) =>
+                schema["~run"]({ value: value$1 }, getGlobalConfig()),
+        };
+        return schema;
+    }
+    function transform(operation) {
+        return {
+            kind: "transformation",
+            type: "transform",
+            reference: transform,
+            async: false,
+            operation,
+            "~run"(dataset) {
+                dataset.value = this.operation(dataset.value);
+                return dataset;
+            },
+        };
+    }
+    function getFallback(schema, dataset, config$1) {
+        return typeof schema.fallback === "function"
+            ? schema.fallback(dataset, config$1)
+            : schema.fallback;
+    }
+    function getDefault(schema, dataset, config$1) {
+        return typeof schema.default === "function"
+            ? schema.default(dataset, config$1)
+            : schema.default;
+    }
+    function literal(literal_, message$1) {
+        return _standardSchema({
+            kind: "schema",
+            type: "literal",
+            reference: literal,
+            expects: _stringify(literal_),
+            async: false,
+            literal: literal_,
+            message: message$1,
+            "~run"(dataset, config$1) {
+                if (_isSameValueZero(dataset.value, this.literal))
+                    dataset.typed = true;
+                else _addIssue(this, "type", dataset, config$1);
+                return dataset;
+            },
+        });
+    }
+    function object(entries$1, message$1) {
+        return _standardSchema({
+            kind: "schema",
+            type: "object",
+            reference: object,
+            expects: "Object",
+            async: false,
+            entries: entries$1,
+            message: message$1,
+            "~run"(dataset, config$1) {
+                const input = dataset.value;
+                if (input && typeof input === "object") {
+                    dataset.typed = true;
+                    dataset.value = {};
+                    for (const key in this.entries) {
+                        const valueSchema = this.entries[key];
+                        if (
+                            key in input ||
+                            ((valueSchema.type === "exact_optional" ||
+                                valueSchema.type === "optional" ||
+                                valueSchema.type === "nullish") &&
+                                valueSchema.default !== void 0)
+                        ) {
+                            const value$1 =
+                                key in input
+                                    ? input[key]
+                                    : getDefault(valueSchema);
+                            const valueDataset = valueSchema["~run"](
+                                { value: value$1 },
+                                config$1,
+                            );
+                            if (valueDataset.issues) {
+                                const pathItem = {
+                                    type: "object",
+                                    origin: "value",
+                                    input,
+                                    key,
+                                    value: value$1,
+                                };
+                                for (const issue of valueDataset.issues) {
+                                    if (issue.path)
+                                        issue.path.unshift(pathItem);
+                                    else issue.path = [pathItem];
+                                    dataset.issues?.push(issue);
+                                }
+                                if (!dataset.issues)
+                                    dataset.issues = valueDataset.issues;
+                                if (config$1.abortEarly) {
+                                    dataset.typed = false;
+                                    break;
+                                }
+                            }
+                            if (!valueDataset.typed) dataset.typed = false;
+                            dataset.value[key] = valueDataset.value;
+                        } else if (valueSchema.fallback !== void 0)
+                            dataset.value[key] = getFallback(valueSchema);
+                        else if (
+                            valueSchema.type !== "exact_optional" &&
+                            valueSchema.type !== "optional" &&
+                            valueSchema.type !== "nullish"
+                        ) {
+                            _addIssue(this, "key", dataset, config$1, {
+                                input: void 0,
+                                expected: `"${key}"`,
+                                path: [
+                                    {
+                                        type: "object",
+                                        origin: "key",
+                                        input,
+                                        key,
+                                        value: input[key],
+                                    },
+                                ],
+                            });
+                            if (config$1.abortEarly) break;
+                        }
+                    }
+                } else _addIssue(this, "type", dataset, config$1);
+                return dataset;
+            },
+        });
+    }
+    function optional(wrapped, default_) {
+        return _standardSchema({
+            kind: "schema",
+            type: "optional",
+            reference: optional,
+            expects: `(${wrapped.expects} | undefined)`,
+            async: false,
+            wrapped,
+            default: default_,
+            "~run"(dataset, config$1) {
+                if (dataset.value === void 0) {
+                    if (this.default !== void 0)
+                        dataset.value = getDefault(this, dataset, config$1);
+                    if (dataset.value === void 0) {
+                        dataset.typed = true;
+                        return dataset;
+                    }
+                }
+                return this.wrapped["~run"](dataset, config$1);
+            },
+        });
+    }
+    function string(message$1) {
+        return _standardSchema({
+            kind: "schema",
+            type: "string",
+            reference: string,
+            expects: "string",
+            async: false,
+            message: message$1,
+            "~run"(dataset, config$1) {
+                if (typeof dataset.value === "string") dataset.typed = true;
+                else _addIssue(this, "type", dataset, config$1);
+                return dataset;
+            },
+        });
+    }
+    function pipe(...pipe$1) {
+        return _standardSchema({
+            ...pipe$1[0],
+            pipe: pipe$1,
+            "~run"(dataset, config$1) {
+                for (const item of pipe$1)
+                    if (item.kind !== "metadata") {
+                        if (
+                            dataset.issues &&
+                            (item.kind === "schema" ||
+                                item.kind === "transformation")
+                        ) {
+                            dataset.typed = false;
+                            break;
+                        }
+                        if (
+                            !dataset.issues ||
+                            (!config$1.abortEarly && !config$1.abortPipeEarly)
+                        )
+                            dataset = item["~run"](dataset, config$1);
+                    }
+                return dataset;
+            },
+        });
+    }
+    function safeParse(schema, input, config$1) {
+        const dataset = schema["~run"](
+            { value: input },
+            getGlobalConfig(config$1),
+        );
+        return {
+            typed: dataset.typed,
+            success: !dataset.issues,
+            output: dataset.value,
+            issues: dataset.issues,
+        };
+    }
+    var SyllabusDateTimeSchema = pipe(
+        string(),
+        transform((input) => {
+            const date = new Date(input);
+            date.setSeconds(0, 0);
+            return date;
+        }),
+    );
+    var SyllabusItemSchema = pipe(
+        object({
+            type: literal("SyllabusLessonType"),
+            lesson: object({
+                captureStartedAt: optional(SyllabusDateTimeSchema),
+                captureEndedAt: optional(SyllabusDateTimeSchema),
+                startTimeUTC: SyllabusDateTimeSchema,
+                endTimeUTC: SyllabusDateTimeSchema,
+                lesson: object({ id: string() }),
+            }),
+        }),
+        transform((input) => ({
+            id: input.lesson.lesson.id,
+            startDate:
+                input.lesson.captureStartedAt ?? input.lesson.startTimeUTC,
+            endDate: input.lesson.captureEndedAt ?? input.lesson.endTimeUTC,
+        })),
+    );
+    var SyllabusService = class SyllabusService extends HardService {
+        courseId;
+        items = [];
+        constructor(courseId) {
+            super("Syllabus");
+            this.courseId = courseId;
+            this.init();
+        }
+        async init() {
+            try {
+                this.reporter.report("Fetching the syllabus");
+                const json = await (
+                    await fetch(
+                        `https://echo360.net.au/section/${this.courseId}/syllabus`,
+                        {
+                            credentials: "include",
+                            method: "GET",
+                            mode: "cors",
+                        },
+                    )
+                ).json();
+                if (!json.data) {
+                    this.reporter.warn("Syllabus response had no data field");
+                    return false;
+                }
+                const parsed = [];
+                let skipped = 0;
+                for (const raw of json.data) {
+                    const result = safeParse(SyllabusItemSchema, raw);
+                    if (result.success) parsed.push(result.output);
+                    else skipped++;
+                }
+                this.reporter.tell(
+                    "Successfully read and parsed the syllabus, skipped " +
+                        skipped +
+                        " items",
+                );
+                this.items = parsed;
+                this.UI.attachOptionsPlatform();
+                return true;
+            } catch (e) {
+                this.reporter.scream("Syllabus fetch threw an error: " + e);
+                return false;
+            }
+        }
+        isSameDay(a, b) {
+            return (
+                a.getFullYear() === b.getFullYear() &&
+                a.getMonth() === b.getMonth() &&
+                a.getDate() === b.getDate()
+            );
+        }
+        findLessonsByDate(date) {
+            return this.items.filter((item) =>
+                this.isSameDay(item.startDate, date),
+            );
+        }
+        async getTodaysLessonElement() {
+            const todays = this.getTodaysLessons();
+            if (todays.length == 0) {
+                console.info("No lessons today");
+                return null;
+            }
+            const first = todays[0];
+            const lessonElement = await waitForElement(
+                `[data-test-lessonid="${first.id}"]`,
+            );
+            if (!lessonElement) {
+                console.error(
+                    "Something went wrong, no element found for lesson ",
+                    first.id,
+                );
+                return null;
+            }
+            return lessonElement;
+        }
+        getTodaysLessons() {
+            const today = new Date();
+            return this.findLessonsByDate(today);
+        }
+        UI = {
+            attachOptionsPlatform: async () => {
+                const platform = fromTemplate(syllabusPlatform_default);
+                const first = this.getTodaysLessons()[0];
+                const lessonElement = await this.getTodaysLessonElement();
+                if (!lessonElement) {
+                    console.error("No lesson element found for today's lesson");
+                    return;
+                }
+                platform
+                    .querySelector(".jump-button")
+                    ?.addEventListener("click", () => {
+                        lessonElement.scrollIntoView({ behavior: "smooth" });
+                        const ring = this.createHighlightRing(lessonElement);
+                        setTimeout(() => {
+                            ring.remove();
+                        }, 1500);
+                    });
+                platform
+                    .querySelector(".watch-button")
+                    ?.addEventListener("click", () => {
+                        window.location.assign(
+                            `https://echo360.net.au/lesson/${first.id}/classroom`,
+                        );
+                    });
+                document.body.append(platform);
+            },
+        };
+        createHighlightRing(target) {
+            const ring = document.createElement("div");
+            ring.className = "be360-highlight-ring";
+            document.body.appendChild(ring);
+            const ringPadding = 3;
+            function position() {
+                const rect = target.getBoundingClientRect();
+                ring.style.top = `${rect.top - ringPadding}px`;
+                ring.style.left = `${rect.left - ringPadding}px`;
+                ring.style.width = `${rect.width + 6}px`;
+                ring.style.height = `${rect.height + 6}px`;
+            }
+            position();
+            window.addEventListener("scroll", position, true);
+            window.addEventListener("resize", position);
+            return ring;
+        }
+    };
+    SyllabusService = __decorate(
+        [hidden(settings.syllabus.hidden)],
+        SyllabusService,
+    );
+    function LessonList(courseId) {
+        new SyllabusService(courseId);
+    }
+    var style_default =
+        "#switchboard input{background-color:red}#switchboard .top-bar{flex-direction:row;justify-content:space-between;align-items:center;margin-bottom:10px;display:flex}#switchboard .close-button{color:#000;background-color:#0000000d;border:none;border-radius:20px;outline:none;width:35px;height:35px}#switchboard .top-bar h1{margin:0;font-size:24px;font-weight:600}#switchboard input[type=checkbox]{appearance:none;cursor:pointer;background-color:var(--primary-color-faded);background-image:radial-gradient(circle at 14px 14px,#fff 0 10.5px,#0000 11px);background-position:0 0;background-repeat:no-repeat;border:none;border-radius:999px;flex:none;width:52px;height:28px;margin:0;transition:background-color .25s cubic-bezier(.34,1.2,.64,1),background-position .25s cubic-bezier(.34,1.2,.64,1)}#switchboard input[type=checkbox]:checked{background-color:var(--primary-color);background-position:24px 0}#switchboard input[type=checkbox]:focus-visible{outline:2px solid var(--primary-color);outline-offset:3px}#switchboard .setting-row{cursor:pointer;-webkit-user-select:none;user-select:none;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;display:flex}#switchboard .setting-row+.setting-row{border-top:1px solid #00000014}#switchboard{box-sizing:border-box;-webkit-font-smoothing:antialiased;opacity:0;width:500px;transition:opacity .2s ease-out, scale .2s ease-out, overlay .2s allow-discrete, display .2s allow-discrete;border:none;border-radius:37.5px;outline:none;margin:auto;padding:20px;scale:.97;box-shadow:0 2px 4px #0003,0 8px 24px #0000004d,0 24px 80px #00000073}#switchboard[open]{opacity:1;scale:1}@starting-style{#switchboard[open]{opacity:0;scale:.97}}#switchboard p{margin:0;font-size:14px;font-weight:500}#switchboard::backdrop{-webkit-backdrop-filter:blur(1px)saturate(70%);opacity:0;transition:opacity .2s ease-out, overlay .2s allow-discrete, display .2s allow-discrete;background:#0003}#switchboard[open]::backdrop{opacity:1}@starting-style{#switchboard[open]::backdrop{opacity:0}}.be360-highlight-ring{isolation:isolate;border:7px solid var(--primary-color);box-sizing:border-box;pointer-events:none;z-index:2147483647;opacity:0;border-radius:7px;animation:1.5s ease-in-out forwards be360-ring-pulse;position:fixed}@keyframes be360-ring-pulse{0%{opacity:0}15%{opacity:1}85%{opacity:1}to{opacity:0}}.syllabus-options-box{border-radius:30px;border-end-end-radius:0;z-index:9999;color:#789;background-color:#f7f7f7;border:1px solid #eee1e3;border-bottom-left-radius:0;flex-direction:column;align-items:center;gap:10px;padding:10px 10px 15px;font-size:14px;animation:.35s cubic-bezier(.34,1.56,.64,1) forwards platform-pop-in;display:flex;position:fixed;bottom:0;right:10px;box-shadow:0 5px 15px #0000004d}@keyframes platform-pop-in{0%{transform:translateY(40px)scale(.9)}to{transform:translateY(0)scale(1)}}.syllabus-button-group{flex-direction:row;gap:2px;width:440px;display:flex}.watch-button{background-color:var(--primary-color);color:#fff;cursor:pointer;border:none;border-radius:5px 20px 20px 5px;flex:1;height:40px;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.jump-button{background-color:var(--primary-color-faded);height:40px;color:var(--primary-color);cursor:pointer;font-weight:semibold;border:none;border-radius:20px 5px 5px 20px;flex:1;padding:10px 0;transition:all .2s cubic-bezier(.34,1.56,.64,1);position:relative}.options-button{aspect-ratio:1;background-color:#dcdcdc;border:none;border-radius:20px;justify-content:center;align-items:center;height:40px;margin-left:6px;transition:all .8s cubic-bezier(.34,1,.64,1);display:flex;position:relative}.jump-button:hover,.watch-button:hover{flex:1.25}.options-button:hover{rotate:180deg}.speed-popover{--ease:cubic-bezier(.34, 1.05, .64, 1);--open-duration:.15s;--open-fade-duration:.2s;--close-duration:.15s;--close-fade-duration:.2s;--closed-scale:.9;--closed-offset:12px;-webkit-backdrop-filter:blur(200px)saturate(40%);backdrop-filter:blur(200px)saturate(40%);color:#fff;width:350px;inset:unset;position-anchor:--anchor;justify-self:anchor-center;bottom:calc(anchor(top) + 20px);opacity:0;scale:var(--closed-scale);translate:0 var(--closed-offset);transform-origin:bottom;transition:opacity var(--close-fade-duration) var(--ease), scale var(--close-duration) var(--ease), translate var(--close-duration) var(--ease), overlay var(--close-duration) allow-discrete, display var(--close-duration) allow-discrete;background:#ffffff0d;border:1px solid #ffffff0d;border-radius:28px;outline:0;margin:0;padding:15px 10px 10px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;position:fixed}.speed-popover:popover-open{opacity:1;transition:opacity var(--open-fade-duration) var(--ease), scale var(--open-duration) var(--ease), translate var(--open-duration) var(--ease), overlay var(--open-duration) allow-discrete, display var(--open-duration) allow-discrete;translate:0;scale:1}@starting-style{.speed-popover:popover-open{opacity:0;scale:var(--closed-scale);translate:0 var(--closed-offset)}}.speed-popover .button-row{flex-direction:row;justify-content:center;align-items:center;gap:3px;width:100%;display:flex}.speed-popover .button-row+.button-row{margin-top:10px}#timemachine-button{anchor-name:--anchor}.speed-popover button[data-speed]{color:#fff;background-color:#ffffff1a;border:none;border-radius:18px;outline:none;flex:1;height:36px;font-size:14px;font-weight:500}.speed-popover .plus{aspect-ratio:1;color:#fff;background-color:#ffffff1a;border:none;border-radius:18px;outline:none;justify-content:center;align-items:center;height:36px;font-size:18px;display:flex}.speed-popover p{text-align:center;flex:1;margin:0;padding:0;font-size:24px;font-weight:600}.speed-popover .total-time-p{text-transform:capitalise;color:#fff6;margin-top:10px;font-size:12px;font-style:italic;font-weight:400}.icon-button-captions{aspect-ratio:1;color:#fff;cursor:pointer;background:0 0;border:none;border-radius:2px;justify-content:center;align-items:center;height:2rem;padding:4px;font-size:22px;display:flex}.icon-button-captions:hover{color:#000;background:#fff}.icon-button-captions:active{color:#000;background:#ffffff80}.icon-button-captions:focus:not(:focus-visible){outline:none}.icon-button-captions[data-enabled]{background:var(--primary-color);color:#fff}.icon-button-captions[data-enabled]:hover{background:var(--primary-color-darker)}:root{--primary-color:#d5006c;--primary-color-darker:#b3005c;--primary-color-faded:#ffcce6}";
+    var ArtistService = class extends HardService {
+        constructor() {
+            super("Artist");
+        }
+        paint() {
+            const style = document.createElement("style");
+            style.id = "be360-styles";
+            style.textContent = style_default;
+            this.reporter.report("Injected the stylesheet from style.css");
+            document.head.appendChild(style);
+            const PHOSPHOR_BASE =
+                "https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src";
+            const injectStylesheet = (href) => {
+                const link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.type = "text/css";
+                link.href = href;
+                document.head.appendChild(link);
+                this.reporter.report(
+                    `Injected the stylesheet with the href: ${href}`,
+                );
+                return link;
+            };
+            injectStylesheet(`${PHOSPHOR_BASE}/regular/style.css`);
+            injectStylesheet(`${PHOSPHOR_BASE}/fill/style.css`);
+            injectStylesheet(`${PHOSPHOR_BASE}/bold/style.css`);
+        }
+    };
+    var _RouterService;
+    var RouterService = class RouterService extends HardService {
+        static {
+            _RouterService = this;
+        }
+        static routes = [
+            {
+                name: "Lesson",
+                matcher: (location) => {
+                    return { matches: location.pathname.includes("/lesson") };
+                },
+                handler: () => {
+                    lesson();
+                },
+            },
+            {
+                name: "Lessons List",
+                matcher: (location) => {
+                    const match = location.pathname.match(
+                        "/section/(?<course_id>.+)/home",
+                    );
+                    if (match && match.groups) {
+                        const courseId = match.groups["course_id"];
+                        if (courseId)
+                            return {
+                                matches: true,
+                                data: { courseId },
+                            };
+                    }
+                    return { matches: false };
+                },
+                handler: (data) => {
+                    LessonList(data.courseId);
+                },
+            },
+        ];
+        constructor() {
+            super("Router");
+        }
+        route() {
+            var location = window.location;
+            for (const route of _RouterService.routes) {
+                const result = route.matcher(location);
+                if (result.matches) {
+                    this.report(`Matched route for (${route.name})`);
+                    new ArtistService().paint();
+                    route.handler(result.data);
+                    return;
+                }
+            }
+            this.reporter.report(`No route matched for ${location.pathname}`);
+        }
+    };
+    RouterService = _RouterService = __decorate([reporter], RouterService);
+    var switchboard_default =
+        '<div class="top-bar">\n    <h1>Switchboard</h1>\n    <button commandfor="switchboard" command="close" class="close-button">\n        <i class="ph-bold ph-x"></i>\n    </button>\n</div>\n\n<label class="setting-row">\n    <span>Disable distractor phone?</span>\n    <input type="checkbox" id="phone-enabled" name="phone-enabled" />\n</label>\n\n<label class="setting-row">\n    <span>Disable timemachine?</span>\n    <input\n        type="checkbox"\n        id="timemachine-enabled"\n        name="timemachine-enabled"\n    />\n</label>\n<label class="setting-row">\n    <span>Better timemachine?</span>\n    <input\n        type="checkbox"\n        id="timemachine-more-speed"\n        name="timemachine-more-speed"\n    />\n</label>\n<label class="setting-row">\n    <span>Hide native speed selector?</span>\n    <input\n        type="checkbox"\n        id="timemachine-hide-native"\n        name="timemachine-hide-native"\n    />\n</label>\n\n<label class="setting-row">\n    <span>Disable captions?</span>\n    <input type="checkbox" id="captions-enabled" name="captions-enabled" />\n</label>\n\n<label class="setting-row">\n    <span>Disable syllabus?</span>\n    <input type="checkbox" id="syllabus-enabled" name="syllabus-enabled" />\n</label>\n';
+    function resolve(path) {
+        const parts = path.split(".");
+        const last = parts.pop();
+        return [parts.reduce((obj, k) => obj[k], settings), last];
+    }
+    function bindCheckbox(root, selector, path, onChange) {
+        const input = root.querySelector(selector);
+        if (!input) return null;
+        const [parent, key] = resolve(path);
+        input.checked = Boolean(parent[key]);
+        input.addEventListener("change", () => {
+            parent[key] = input.checked;
+            onChange?.(input.checked);
+        });
+        return input;
+    }
+    var SwitchboardService = class extends HardService {
+        dialog = null;
+        constructor() {
+            super("Switchboard");
+            this.UI_attachSettingsDialog();
+            window.switchboard = () => {
+                this.show();
+            };
+            this.reporter.report("Use switchboard() to open");
+        }
+        show() {
+            if (!this.dialog) return;
+            this.dialog.showModal();
+        }
+        UI_attachSettingsDialog() {
+            this.dialog = document.createElement("dialog");
+            this.dialog.id = "switchboard";
+            this.dialog.classList.add("switchboard");
+            this.dialog.innerHTML = switchboard_default;
+            bindCheckbox(this.dialog, "#phone-enabled", "phone.hidden");
+            bindCheckbox(
+                this.dialog,
+                "#timemachine-enabled",
+                "timemachine.hidden",
+            );
+            bindCheckbox(this.dialog, "#captions-enabled", "captions.hidden");
+            bindCheckbox(this.dialog, "#syllabus-enabled", "syllabus.hidden");
+            bindCheckbox(
+                this.dialog,
+                "#timemachine-more-speed",
+                "timemachine.betterTimemachine",
+            );
+            bindCheckbox(
+                this.dialog,
+                "#timemachine-hide-native",
+                "timemachine.hideNativeSpeedSelector",
+            );
+            document.body.appendChild(this.dialog);
+        }
+    };
+    (async function () {
+        "use strict";
+        new SwitchboardService();
+        if (settings.better_echo360.disabled) return;
+        new RouterService().route();
+    })();
 })();

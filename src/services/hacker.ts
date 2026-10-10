@@ -41,7 +41,7 @@ export default class HackerService {
     private static findStore(store: ZustandStore): any | null {
         // --- Step 1: capture webpack's require function ---
         var storeName = enumName(ZustandStore, store);
-        var prefix = `(${storeName}) `
+        var prefix = `(${storeName}) `;
         HackerService.reporter.report(prefix + "Finding");
         var req = w.__cr;
         if (!req) {
@@ -118,7 +118,9 @@ export default class HackerService {
             }
         }
 
-        this.reporter.report(prefix + "Found: " + candidates.length + " candidates");
+        this.reporter.report(
+            prefix + "Found: " + candidates.length + " candidates",
+        );
 
         // --- Step 3: narrow to the one matching your target key ---
         var match = candidates.find(function (s) {
@@ -131,9 +133,12 @@ export default class HackerService {
 
         w.__candidates = candidates;
         if (!match) {
-            this.reporter.warn(prefix + "No matches found, look to window.__candidates for more")
+            this.reporter.warn(
+                prefix +
+                    "No matches found, look to window.__candidates for more",
+            );
         } else {
-            this.reporter.report(prefix + "Found store")
+            this.reporter.report(prefix + "Found store");
         }
 
         return match || null;
