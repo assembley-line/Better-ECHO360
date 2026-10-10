@@ -2,6 +2,8 @@ import { HardService } from "@/services";
 import template from "@/templates/switchboard.html?raw";
 import { bindCheckbox } from "@/tools/bindCheckbox";
 
+import { unsafeWindow } from "$";
+
 class SwitchboardService extends HardService {
     // This class allows for the user to toggle defined settings, and attaches a settings dialog
 
@@ -11,7 +13,7 @@ class SwitchboardService extends HardService {
         super("Switchboard");
 
         this.UI_attachSettingsDialog();
-        window.switchboard = () => {
+        unsafeWindow.switchboard = () => {
             this.show();
         };
         this.reporter.report("Use switchboard() to open");
